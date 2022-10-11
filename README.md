@@ -1,5 +1,8 @@
 # fgcmblensing
-Foregrounds in CMB lensing
+Foregrounds in CMB lensing iterative estimator.
+
+
+See here for details about the roadmap https://github.com/Saladino93/knowledge/blob/master/Cosmology/Iterative%20CMB%20Lensing%20Foregrounds/Roadmap.md
 
 
 ## Steps to produce foreground biases plots
