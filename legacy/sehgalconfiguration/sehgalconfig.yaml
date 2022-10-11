@@ -1,0 +1,39 @@
+#from Sehgal et al., 0908.0540
+cosmology:
+  omega_b: 0.044
+  omega_m: 0.264
+  omega_lambda: 0.736
+  h: 0.71
+  ns: 0.96
+  sigma8: 0.80
+
+theorycmb:
+  lmax: 6000
+  lens_potential_accuracy: 4
+  cmb_name: 'theory_sehgal.txt'
+  noise_name: 'ASO_LAT_Nell_T_baseline_fsky0p4.txt'
+  nus: [27, 39, 93, 145, 225, 280]
+  cross_nus: [[0, 1], [2, 3], [4, 5]] #indices of correlated noises
+  nu0: 145
+  fgname: 'totforegrounds.txt'
+
+#you define functions to get each simulation
+sims:
+  path: 1
+  cmblensed: 1
+  cmbprimary: 1
+  kappa: 'lambda path, nu: healpix_4096_KappaeffLSStoCMBfullsky.fits'
+  ksz: 1
+  tsz: 'lambda path, nu: 1'
+  cib: 'lambda path, nu: 1'
+  radiops: 'lambda path, nu: 1'
+
+
+QE:
+  nside: 4096
+  mlmax: 6000
+  kappa_lmin: 100
+  kappa_lmax: 3000
+
+
+
