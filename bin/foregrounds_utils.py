@@ -3,6 +3,13 @@ from scipy.interpolate import *
 
 import constants as const
 
+import scipy
+
+
+def randomizing_fg(mappa: np.ndarray):
+     f = lambda z: np.abs(z) * np.exp(1j*np.random.uniform(0., 2.*np.pi), size = z.shape)
+     return f(mappa)
+
 
 def fnu(nu, tcmb = const.default_tcmb):
     """
@@ -36,7 +43,8 @@ class Foregrounds():
         self.fdl_to_cl = lambda l: 1./( l*(l+1.)/(2.*np.pi) )
 
 
-        data = np.genfromtxt("./input/universe_Planck15/camb/lenspotentialCls.dat")
+        #data = np.genfromtxt("./input/universe_Planck15/camb/lenspotentialCls.dat")
+        data = np.genfromtxt("./input/_lenspotentialCls.dat")
         self.funlensedTT_template = UnivariateSpline(data[:,0], data[:,1],k=1,s=0)
         lmin_unlensedCMB = data[0,0]
         lmax_unlensedCMB = data[-1,0]
@@ -44,7 +52,8 @@ class Foregrounds():
 
 
         # lensed CMB
-        data = np.genfromtxt("./input/universe_Planck15/camb/lensedCls.dat")
+        #data = np.genfromtxt("./input/universe_Planck15/camb/lensedCls.dat")
+        data = np.genfromtxt("./input/_lensedCls.dat")
         self.flensedTT_template = UnivariateSpline(data[:,0], data[:,1],k=1,s=0)
         lmin_lensedCMB = data[0,0]
         lmax_lensedCMB = data[-1,0]
@@ -226,4 +235,22 @@ class Foregrounds():
         result += self.fkSZ(l)
         result += self.ftSZ_CIB(l)
         result += self.fradioPoisson(l)
+        return result
+
+
+    # outputs the uncertainty on amplitude of profile
+    # given the total power in the map
+    # fprofile: isotropic profile (before beam convolution)
+    # if none, use the beam as profile (ie point source)
+    # If temperature map in muK, then output in muK*sr
+    # If temperature map in Jy/sr, then output in Jy
+    def fsigmaMatchedFilter(self, fprofile = None, ftotalTT = None):
+        if ftotalTT is None:
+            ftotalTT = self.ftotalTT
+        if fprofile is None:
+            f = lambda l: l/(2.*np.pi) / ftotalTT(l)
+        else:
+            f = lambda l: l/(2.*np.pi) * fprofile(l) / ftotalTT(l)
+        result = scipy.integrate.quad(f, self.lMin, self.lMaxT, epsabs=0., epsrel=1.e-3)[0]
+        result = 1./np.sqrt(result)
         return result
