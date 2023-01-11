@@ -6,10 +6,10 @@ import constants as const
 import scipy
 
 
-def randomizing_fg(mappa: np.ndarray):
-     f = lambda z: np.abs(z) * np.exp(1j*np.random.uniform(0., 2.*np.pi), size = z.shape)
-     return f(mappa)
 
+def randomizing_fg(mappa: np.ndarray):
+     f = lambda z: np.abs(z) * np.exp(1j*np.random.uniform(0., 2.*np.pi, size = z.shape))
+     return f(mappa)
 
 def fnu(nu, tcmb = const.default_tcmb):
     """
@@ -30,9 +30,12 @@ def get_tsz_from_comptony(comptony, freq, tcmb = const.default_tcmb):
 
 class Foregrounds():
 
-    def __init__(self, nu1, nu2):
-        self.nu1 = nu1
-        self.nu2 = nu2
+    def __init__(self, nu1, nu2, input_dir: str = "../input/", input_version: str = 'websky'):
+        '''
+        nu1, nu2 in GHz
+        '''
+        self.nu1 = nu1*1e9
+        self.nu2 = nu2*1e9
 
         self.c = const.C
         self.h = const.H
@@ -44,7 +47,7 @@ class Foregrounds():
 
 
         #data = np.genfromtxt("./input/universe_Planck15/camb/lenspotentialCls.dat")
-        data = np.genfromtxt("./input/_lenspotentialCls.dat")
+        data = np.genfromtxt(input_dir+f"{input_version}/{input_version}_lenspotentialCls.dat")
         self.funlensedTT_template = UnivariateSpline(data[:,0], data[:,1],k=1,s=0)
         lmin_unlensedCMB = data[0,0]
         lmax_unlensedCMB = data[-1,0]
@@ -53,7 +56,7 @@ class Foregrounds():
 
         # lensed CMB
         #data = np.genfromtxt("./input/universe_Planck15/camb/lensedCls.dat")
-        data = np.genfromtxt("./input/_lensedCls.dat")
+        data = np.genfromtxt(input_dir+f"{input_version}/{input_version}_lensedCls.dat")
         self.flensedTT_template = UnivariateSpline(data[:,0], data[:,1],k=1,s=0)
         lmin_lensedCMB = data[0,0]
         lmax_lensedCMB = data[-1,0]
@@ -61,7 +64,7 @@ class Foregrounds():
 
 
         # tSZ: Dunkley et al 2013
-        data = np.genfromtxt("./input/cmb/digitizing_SZ_template/tSZ.txt")
+        data = np.genfromtxt(input_dir+"/cmb/digitizing_SZ_template/tSZ.txt")
         ftSZ_template = UnivariateSpline(data[:,0], data[:,1],k=1,s=0)
         a_tSZ = 4.0
         lmin_tSZ = data[0,0]
@@ -69,7 +72,7 @@ class Foregrounds():
         self.ftSZ = np.vectorize(lambda l: (l>=lmin_tSZ and l<=lmax_tSZ) * a_tSZ * self.tszFreqDpdceTemp(self.nu1)*self.tszFreqDpdceTemp(self.nu2)/self.tszFreqDpdceTemp(150.e9)**2 * ftSZ_template(l) * self.fdl_to_cl(l))
 
         # kSZ: Dunkley et al 2013
-        data = np.genfromtxt("./input/cmb/digitizing_SZ_template/kSZ.txt")
+        data = np.genfromtxt(input_dir+"/cmb/digitizing_SZ_template/kSZ.txt")
         fkSZ_template = UnivariateSpline(data[:,0], data[:,1],k=1,s=0)
         a_kSZ = 1.5  # 1.5 predicted by Battaglia et al 2010. Upper limit from Dunkley+13 is 5.
         lmin_kSZ = data[0,0]
@@ -83,13 +86,15 @@ class Foregrounds():
         betaC = 1.2 #2.1
         Td = 24 #9.7
         # watch for the minus sign
-        data = np.genfromtxt ("./input/cmb/digitizing_tSZCIB_template/minus_tSZ_CIB.txt")
+        data = np.genfromtxt (input_dir+"/cmb/digitizing_tSZCIB_template/minus_tSZ_CIB.txt")
         ftSZCIB_template = UnivariateSpline(data[:,0], data[:,1],k=1,s=0)
         lmin_tSZ_CIB = data[0,0]
         lmax_tSZ_CIB = data[-1,0]
         self.ftSZ_CIB = np.vectorize(lambda l: (l>=lmin_tSZ_CIB and l<=lmax_tSZ_CIB) * (-2.)*xi*np.sqrt(a_tSZ*a_CIBC)* self.fprime(self.nu1, self.nu2, betaC, Td)/self.fprime(150.e9, 150.e9, betaC, Td) * ftSZCIB_template(l) * self.fdl_to_cl(l))
 
 
+    def Jyoversr_to_muKcmb(self, mappa, freq): 
+        return mappa * 1.e-26 / self.dBdT(freq, self.Tcmb) * 1.e6
 
     def convertIntSITo(self, nu, kind="intSI"):
         '''kind: "intSI", "intJy/sr", "tempKcmb", "tempKrj"

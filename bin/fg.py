@@ -70,7 +70,7 @@ def process_tsz(comptony, freq, tcmb = const.default_tcmb):
 
 
 
-mlmax = 6000
+mlmax = 7000
 
 freq = 145
 
@@ -104,9 +104,14 @@ nomi = [kappaoutname, cmboutname]
 kappa_alm, cmb_alm = [hp.read_alm(source_dir/f'{nome}_alm.fits') for nome in nomi]
 kappa_alm = kappa_alm.astype(np.complex128)
 
+key = 'cib'
+tsz_map_alm = hp.read_alm(source_dir/f'{key}_alm.fits')#np.load(source_dir/'tsz_map_alm.npy')
+tsz_map_masked_alm = hp.read_alm(source_dir/f'{key}_masked_alm.fits') #np.load(source_dir/'tsz_map_masked_alm.npy')
 
-tsz_map_alm = np.load(source_dir/'tsz_map_alm.npy')
-tsz_map_masked_alm = np.load(source_dir/'tsz_map_masked_alm.npy')
+f = lambda size: np.exp(1j*np.random.uniform(0., 2.*np.pi, size = size))
+size = len(tsz_map_alm)
+factors = f(size)
+tsz_map_randomized_alm = hp.almxfl(tsz_map_alm, factors) #hp.read_alm(f'{source_dir}/tsz_randomized_alm.fits')
 
 
 allelementstosave = np.load('input_cmb_145.npy')
@@ -153,9 +158,13 @@ ucls, tcls = utils.get_theory_dicts(grad = True, nells = nells, lmax = mlmax)
 
 
 
-maps = [cmb_alm, process_tsz(tsz_map_alm, freq), process_tsz(tsz_map_masked_alm, freq)]
+#maps = [cmb_alm, process_tsz(tsz_map_alm, freq), process_tsz(tsz_map_masked_alm, freq)]
 
-codes = [''] #, 'tsz', 'tsz_masked']
+process_tsz = lambda x, y: x if key != 'tsz' else process_tsz
+
+maps = [process_tsz(tsz_map_alm, freq), process_tsz(tsz_map_randomized_alm, freq)]
+
+codes = [key, f'{key}_randomized'] #, 'tsz', 'tsz_masked']
 
 for kappa_lmax in kappa_lmaxes:
 
@@ -182,8 +191,8 @@ for kappa_lmax in kappa_lmaxes:
         input_alm = utils.change_alm_lmax(map_alm.astype(np.complex128), mlmax)
         input_alm_filtered = filter_alms(input_alm, tcls, kappa_lmin, kappa_lmax)
 
-        versions = ['bh'] #['qe', 'bh'] 
-        functions = [qfunc_bh] #[qfunc, qfunc_bh]
+        versions = ['qe'] #['bh'] #['qe', 'bh'] 
+        functions = [qfunc] #[qfunc_bh] #[qfunc, qfunc_bh]
 
         vstuff = {}
 
@@ -213,4 +222,4 @@ for kappa_lmax in kappa_lmaxes:
 
         all_spectra[code] = vstuff
 
-    np.save(f'all_spectra_{kappa_lmax}', all_spectra)
+    np.save(f'all_spectra_{key}_randomized_{kappa_lmax}', all_spectra)

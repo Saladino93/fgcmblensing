@@ -24,13 +24,13 @@ ciboutname = 'cib'
 #names = [kappa_name, cmb_name]
 #names = [ksz_name, tsz_name]
 names = [kappa_name, cmb_name, ksz_name, tsz_name, radio_name, cib_name]
-fgnames = [ksz_name, tsz_name, radio_name, cib_name]
+fgnames = names #[ksz_name, tsz_name, radio_name, cib_name]
 
 
 #nomi = [kappaoutname, cmboutname]
 #nomi = [kszoutname, tszoutname]
 nomi = [kappaoutname, cmboutname, kszoutname, tszoutname, radiooutname, ciboutname]
-fgnomi = [kszoutname, tszoutname, radiooutname, ciboutname]
+fgnomi = nomi #[kszoutname, tszoutname, radiooutname, ciboutname]
 
 maps = [hp.read_map(source_dir/name) for name in names]
 alms = [hp.map2alm(mappa, lmax = mlmax) for mappa in maps]
