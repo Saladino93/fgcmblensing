@@ -21,21 +21,24 @@ from plancklens.sims import maps, phas
 from plancklens.filt import filt_simple, filt_util
 
 from lenscarf import remapping, utils_scarf, utils_sims
-from lenscarf.iterators import cs_iterator as scarf_iterator, steps
+from lenscarf.iterators import cs_iterator_fast as scarf_iterator, steps
+from lenscarf.iterators import cs_iterator as scarf_iterator_full
 from lenscarf.utils import cli
-from lenscarf.utils_hp import gauss_beam, almxfl, alm_copy
+from lenscarf.utils_hp import gauss_beam, almxfl, alm_copy, Alm
 from lenscarf.opfilt.opfilt_iso_tt_wl import alm_filter_nlev_wl as alm_filter_tt_wl
 
 import itfgs.sims.sims_cmbs as simsit
 
 from plancklens.helpers import mpi
 
-suffix = 'SOGaussianOnly' # descriptor to distinguish this parfile from others...
+suffix = 'fastSOGaussianOnly' # descriptor to distinguish this parfile from others...
 SIMDIR = opj(os.environ['SCRATCH'], 'n32', suffix, 'cmbs')  # This is where the postborn are (or will be saved)
 TEMP =  opj(os.environ['SCRATCH'], 'n32', suffix, 'lenscarfrecs')
 
-# LOAD FOREGROUND POWER 
-thloc = '../input/'
+# LOAD FOREGROUND POWER
+
+homedir = os.environ['HOME'] 
+thloc = f'{homedir}/fgcmblensing/input/'
 allelementstosave = np.load(f'{thloc}input_cmb_145.npy')
 ells, lcmb, tsz, ksz, radio, cib, dust, nl145, totalcmb, totalnoisecmb = allelementstosave.T
 fgs = tsz+ksz+radio+cib+dust
@@ -76,7 +79,11 @@ lenjob_geometry = utils_scarf.Geom.get_thingauss_geometry(lmax_unl, 2, zbounds=z
 lenjob_pbgeometry =utils_scarf.pbdGeometry(lenjob_geometry, utils_scarf.pbounds(pb_ctr, pb_extent))
 lensres = 0.7  # Deflection operations will be performed at this resolution
 Lmin = 2 # The reconstruction of all lensing multipoles below that will not be attempted
-stepper = steps.nrstep(lmax_qlm, mmax_qlm, val=0.5) # handler of the size steps in the MAP BFGS iterative search
+
+step_val = np.arange(0, Alm.getsize(lmax_qlm, mmax_qlm), 1) # The size of the steps in the MAP BFGS iterative search
+Lcut = 30
+step_val = 0.5*(step_val>Lcut)
+stepper = steps.nrstep(lmax_qlm, mmax_qlm, val=step_val) # handler of the size steps in the MAP BFGS iterative search
 mc_sims_mf_it0 = np.array([]) # sims to use to build the very first iteration mean-field (QE mean-field) Here 0 since idealized
 
 
@@ -226,15 +233,20 @@ def get_itlib(k:str, simidx:int, version:str, cg_tol:float):
     k_geom = filtr.ffi.geom # Customizable Geometry for position-space operations in calculations of the iterated QEs etc
     # Sets to zero all L-modes below Lmin in the iterations:
     #NOTE: IS USING THE R_UNL RESPONSE TO OBTAIN ~ (1/Cpp + 1/N0)^-1 OK as first response?
-    iterator = scarf_iterator.iterator_pertmf(libdir_iterator, 'p', (lmax_qlm, mmax_qlm), datmaps,
+    if version == 'full':
+        print('Using full version iterator')
+        iterator = scarf_iterator_full.iterator_pertmf(libdir_iterator, 'p', (lmax_qlm, mmax_qlm), datmaps,
             plm0, mf_resp, R_unl, cpp, cls_unl, filtr, k_geom, chain_descrs(lmax_unl, cg_tol), stepper
             ,mf0=mf0)
+    else:
+        iterator = scarf_iterator.iterator_cstmf(libdir_iterator, 'p', (lmax_qlm, mmax_qlm), datmaps,
+                plm0, mf0, R_unl, cpp, cls_unl, filtr, k_geom, chain_descrs(lmax_unl, cg_tol), stepper)
     return iterator
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='test iterator full-sky with pert. resp.')
-    parser.add_argument('-k', dest='k', type=str, default='p_p', help='rec. type')
+    parser.add_argument('-k', dest='k', type=str, default='ptt', help='rec. type')
     parser.add_argument('-itmax', dest='itmax', type=int, default=-1, help='maximal iter index')
     parser.add_argument('-tol', dest='tol', type=float, default=5., help='-log10 of cg tolerance default')
     parser.add_argument('-imin', dest='imin', type=int, default=-1, help='minimal sim index')
