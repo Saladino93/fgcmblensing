@@ -26,13 +26,18 @@ from lenscarf.utils import cli
 from lenscarf.utils_hp import gauss_beam, almxfl, alm_copy
 from lenscarf.opfilt.opfilt_iso_tt_wl import alm_filter_nlev_wl as alm_filter_tt_wl
 
+import itfgs
 from itfgs.sims.sims_postborn import sims_postborn
 import itfgs.sims.sims_cmbs as simsit
 
 from plancklens.helpers import mpi
 
 
-baseSehgal = opj(os.environ['SCRATCH'], 'SehgalSims')
+include_fgs_power = False
+
+baseSehgal = opj(os.environ['SCRATCH'], 'SKYSIMS/SEHGALSIMS/')
+#baseSehgal = opj(os.environ['SCRATCH'], 'SehgalSims')
+
 SimsShegalDict = {}
 SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'healpix_4096_KappaeffLSStoCMBfullsky.fits')
 
@@ -42,13 +47,20 @@ SimsShegalDict[0] = [lambda idx: opj(baseSehgal, nome) for nome in names]
 
 
 class SehgalSim(sims_postborn):
+
+    kappakey = 'kappa'
+
     def __init__(self, sims: dict, **kwargs):
         super().__init__(**kwargs)
         self.sims = sims
     
-    def get_sim_kappa(self, idx):
+    def get_sim_kappa(self, idx, verbose: bool = True):
+        if verbose:
+            print('Getting special kappa!')
         nome = self.sims[self.kappakey](idx)
         return hp.read_map(nome)
+
+    '''
 
     def get_sim_tlm(self, idx):
         fname = os.path.join(self.lib_dir, 'sim_%04d_tlm.fits' % idx)
@@ -62,24 +74,26 @@ class SehgalSim(sims_postborn):
                 hp.write_alm(fname, somma)
         return hp.read_alm(fname)
 
+    '''
+
 
 
 suffix = 'SOSehgal' # descriptor to distinguish this parfile from others...
-SIMDIR = opj(os.environ['SCRATCH'], 'n32', 'cmbs')  # This is where the postborn are (or will be saved)
-TEMP =  opj(os.environ['SCRATCH'], 'n32', 'lenscarfrecs', suffix)
+SIMDIR = opj(os.environ['SCRATCH'], 'n32', suffix, 'cmbs')  # This is where the postborn are (or will be saved)
+TEMP =  opj(os.environ['SCRATCH'], 'n32', suffix, 'lenscarfrecs')
 
 # LOAD FOREGROUND POWER 
-thloc = '../input/'
+thloc = f'{os.path.dirname(itfgs.__file__)}/../../input/'
 allelementstosave = np.load(f'{thloc}input_cmb_145.npy')
 ells, lcmb, tsz, ksz, radio, cib, dust, nl145, totalcmb, totalnoisecmb = allelementstosave.T
-fgs = tsz+ksz+radio+cib+dust
+fgs = (tsz+ksz+radio+cib+dust)*include_fgs_power
 
 # Fiducial CMB spectra for QE and iterative reconstructions
 # (here we use slightly suboptimal lensed spectra QE weights)
 cls_path = opj(os.path.dirname(plancklens.__file__), 'data', 'clssehgal')
 cls_unl = utils.camb_clfile(opj(cls_path, 'Sehgal_lenspotentialCls.dat'))
 cls_len = utils.camb_clfile(opj(cls_path, '_lensedCls.dat'))
-cls_grad = utils.camb_clfile(opj(cls_path, '_camb_1.0.12_grads.dat'))
+cls_grad = utils.camb_clfile(opj(cls_path, '_camb_1.0.12_grads.dat'), grad_mode = True)
 
 ll = [cls_unl, cls_len, cls_grad]
 for l in ll:
@@ -94,7 +108,8 @@ lmax_ivf, mmax_ivf, beam, nlev_t, nlev_p = (3500, 3500, 1.7, 7., 7. * np.sqrt(2.
 lmin_tlm, lmin_elm, lmin_blm = (100, 100, 100) # The fiducial transfer functions are set to zero below these lmins
 # for delensing useful to cut much more B. It can also help since the cg inversion does not have to reconstruct those.
 
-lmax_qlm, mmax_qlm = (4000, 4000) # Lensing map is reconstructed down to this lmax and mmax
+lmax_phi, mmax_phi = (4000, 4000)
+lmax_qlm, mmax_qlm = (lmax_phi, mmax_phi) # Lensing map is reconstructed down to this lmax and mmax
 # NB: the QEs from plancklens does not support mmax != lmax, but the MAP pipeline does
 lmax_unl, mmax_unl = (4000, 4000) # Delensed CMB is reconstructed down to this lmax and mmax
 
@@ -149,11 +164,14 @@ pix_phas = phas.pix_lib_phas(opj(os.environ['SCRATCH'], 'n32', 'pixphas_nside%s'
 transf_dat =  gauss_beam(beam / 180 / 60 * np.pi, lmax=4096) # (taking here full sims cmb's which are given to 4096)
 
 
+zero_noise = False
 fixed_noise_index = 0 #this will allow to have always the same experimental noise realization
 lmax_cmb = 4096
 dlmax = 1024
-sims      = simsit.cmb_maps_nlev_sehgal(sims_cmb_len = SehgalSim(SIMDIR, lmax = lmax_cmb, cls_unl = cls_unl, dlmax = dlmax, lmin_dlm = 2), cl_transf = transf_dat, 
-                                nlev_t = nlev_t, nlev_p = nlev_p, nside = nside, pix_lib_phas = pix_phas, zero_noise = False, fixed_noise_index = fixed_noise_index)
+
+sims_cmb_len = SehgalSim(sims = SimsShegalDict, lib_dir = SIMDIR, lmax_cmb = lmax_cmb, cls_unl = cls_unl, dlmax = dlmax, lmin_dlm = 2)
+sims      = simsit.cmb_maps_nlev_sehgal(sims_cmb_len = sims_cmb_len, cl_transf = transf_dat, 
+                                nlev_t = nlev_t, nlev_p = nlev_p, nside = nside, pix_lib_phas = pix_phas, zero_noise = zero_noise, fixed_noise_index = fixed_noise_index)
 
 # Makes the simulation library consistent with the zbounds
 sims_MAP  = utils_sims.ztrunc_sims(sims, nside, [zbounds])
