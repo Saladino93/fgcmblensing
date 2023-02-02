@@ -30,7 +30,7 @@ def get_tsz_from_comptony(comptony, freq, tcmb = const.default_tcmb):
 
 class Foregrounds():
 
-    def __init__(self, nu1, nu2, input_dir: str = "../input/", input_version: str = 'websky'):
+    def __init__(self, nu1, nu2, input_dir: str = "../input/", input_version: str = 'Sehgal'):
         '''
         nu1, nu2 in GHz
         '''
@@ -48,6 +48,7 @@ class Foregrounds():
 
         #data = np.genfromtxt("./input/universe_Planck15/camb/lenspotentialCls.dat")
         data = np.genfromtxt(input_dir+f"{input_version}/{input_version}_lenspotentialCls.dat")
+        data = np.nan_to_num(data)
         self.funlensedTT_template = UnivariateSpline(data[:,0], data[:,1],k=1,s=0)
         lmin_unlensedCMB = data[0,0]
         lmax_unlensedCMB = data[-1,0]
@@ -57,6 +58,7 @@ class Foregrounds():
         # lensed CMB
         #data = np.genfromtxt("./input/universe_Planck15/camb/lensedCls.dat")
         data = np.genfromtxt(input_dir+f"{input_version}/{input_version}_lensedCls.dat")
+        data = np.nan_to_num(data)
         self.flensedTT_template = UnivariateSpline(data[:,0], data[:,1],k=1,s=0)
         lmin_lensedCMB = data[0,0]
         lmax_lensedCMB = data[-1,0]

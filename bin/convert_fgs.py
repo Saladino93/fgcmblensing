@@ -66,7 +66,8 @@ somma_alm = 0
 
 for k, v in sky.items():
 
-    factor = Fg.tszFreqDpdceTemp(freq) if k == tszkey else 1
+    #factor = Fg.tszFreqDpdceTemp(freq) if k == tszkey else 1
+    factor = fgutils.tsz_factor_for_ymap(freq) if k == tszkey else 1
 
     print(f'Doing {k}')
 

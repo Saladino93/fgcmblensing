@@ -47,8 +47,8 @@ fgs = tsz+ksz+radio+cib+dust
 # (here we use slightly suboptimal lensed spectra QE weights)
 cls_path = opj(os.path.dirname(plancklens.__file__), 'data', 'clssehgal')
 cls_unl = utils.camb_clfile(opj(cls_path, 'Sehgal_lenspotentialCls.dat'))
-cls_len = utils.camb_clfile(opj(cls_path, '_lensedCls.dat'))
-cls_grad = utils.camb_clfile(opj(cls_path, '_camb_1.0.12_grads.dat'), grad_mode = True)
+cls_len = utils.camb_clfile(opj(cls_path, 'Sehgal_lensedCls.dat'))
+cls_grad = utils.camb_clfile(opj(cls_path, 'Sehgal_camb_1.0.12_grads.dat'), grad_mode = True)
 
 ll = [cls_unl, cls_len, cls_grad]
 for l in ll:
