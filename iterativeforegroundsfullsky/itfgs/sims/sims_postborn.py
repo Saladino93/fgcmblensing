@@ -29,7 +29,7 @@ class sims_postborn(sims_cmbs.sims_cmb_len):
         This just redefines the sims_cmbs.sims_cmb_len method to feed the nonlinear kmap
     """
     def __init__(self, lib_dir, lmax_cmb, cls_unl:dict,
-                 dlmax=1024, lmin_dlm = 2, nside_lens=4096, facres=0, nbands=8, cache_plm=True):
+                 dlmax=1024, lmin_dlm = 2, nside_lens=4096, facres=0, nbands=8, cache_plm=True, lib_pha = None):
 
         lmax_plm = lmax_cmb + dlmax
         mmax_plm = lmax_plm
@@ -42,7 +42,7 @@ class sims_postborn(sims_cmbs.sims_cmb_len):
         self.mmax_plm = mmax_plm
         self.cache_plm = cache_plm
         super(sims_postborn, self).__init__(lib_dir,  lmax_cmb, cmb_cls,
-                                            dlmax=dlmax, nside_lens=nside_lens, facres=facres, nbands=nbands, lmin_dlm = lmin_dlm)
+                                            dlmax=dlmax, nside_lens=nside_lens, facres=facres, nbands=nbands, lmin_dlm = lmin_dlm, lib_pha = lib_pha)
 
     def get_sim_kappa(self, idx: int):
         pass

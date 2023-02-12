@@ -49,6 +49,8 @@ class sims_cmb_unlensed(object):
 
         if lib_pha is None and mpi.rank == 0:
             lib_pha = phas.lib_phas(os.path.join(lib_dir, 'phas'), len(fields), lmax + dlmax)
+        elif lib_pha is not None:
+            print('Using specified lib_pha!')
         #else:  # Check that the lib_alms are compatible :
         #    assert lib_pha.lmax == lmax + dlmax
         mpi.barrier()
@@ -247,7 +249,7 @@ class sims_cmb_len(object):
         pfname = os.path.join(self.lib_dir, 'sim_%04d_plm.fits' % idx)
 
         if not os.path.exists(fname):
-            tlm= self.unlcmbs.get_sim_tlm(self.offset_index(idx, self.offset_cmb[0], self.offset_cmb[1]))
+            tlm = self.unlcmbs.get_sim_tlm(self.offset_index(idx, self.offset_cmb[0], self.offset_cmb[1]))
             dlm = self.get_sim_plm(idx)
             plm = dlm.copy()
             
