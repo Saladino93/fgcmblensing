@@ -82,7 +82,7 @@ class SehgalSim(sims_postborn):
 
 
 
-suffix = 'SOGiulio' # descriptor to distinguish this parfile from others...
+suffix = 'S4Giuliolminrec40new' # descriptor to distinguish this parfile from others...
 
 suffixCMB = suffix
 suffixLensing = suffix+'Born'
@@ -107,15 +107,15 @@ for l in ll:
 ll = np.arange(0, len(cls_len['tt']), 1)
 cls_foregrounds = 0.
 
-lmax_ivf, mmax_ivf, beam, nlev_t, nlev_p = (3500, 3500, 1.7, 7., 7. * np.sqrt(2.))
+lmax_ivf, mmax_ivf, beam, nlev_t, nlev_p = (4000, 4000, 1., 1., 1. * np.sqrt(2.))
 
-lmin_tlm, lmin_elm, lmin_blm = (100, 100, 100) # The fiducial transfer functions are set to zero below these lmins
+lmin_tlm, lmin_elm, lmin_blm = (40, 40, 40) # The fiducial transfer functions are set to zero below these lmins
 # for delensing useful to cut much more B. It can also help since the cg inversion does not have to reconstruct those.
 
-lmax_phi, mmax_phi = (4000, 4000)
+lmax_phi, mmax_phi = (4500, 4500)
 lmax_qlm, mmax_qlm = (lmax_phi, mmax_phi) # Lensing map is reconstructed down to this lmax and mmax
 # NB: the QEs from plancklens does not support mmax != lmax, but the MAP pipeline does
-lmax_unl, mmax_unl = (4000, 4000) # Delensed CMB is reconstructed down to this lmax and mmax
+lmax_unl, mmax_unl = (4500, 4500) # Delensed CMB is reconstructed down to this lmax and mmax
 
 
 #----------------- pixelization and geometry info for the input maps and the MAP pipeline and for lensing operations

@@ -35,7 +35,6 @@ import itfgs.sims.sims_cmbs as simsit
 from plancklens.helpers import mpi
 
 
-
 def camb_clfile_gradient(fname, lmax=None):
     """CAMB spectra (lenspotentialCls, lensedCls or tensCls types) returned as a dict of numpy arrays.
     Args:
@@ -60,7 +59,7 @@ baseSehgal = opj(os.environ['SCRATCH'], 'SKYSIMS/GIULIOSIMS/')
 #baseSehgal = opj(os.environ['SCRATCH'], 'SehgalSims')
 
 SimsShegalDict = {}
-SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'map0_kappa_ecp262_dmn2_lmax8000_first.fits')
+SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'map0_kappa_ecp262_dmn2_lmax8000_first_randomized.fits')
 
 names = ['']
 SimsShegalDict[0] = [lambda idx: opj(baseSehgal, nome) for nome in names]
@@ -82,12 +81,14 @@ class SehgalSim(sims_postborn):
 
 
 
-suffix = 'SOGiulio' # descriptor to distinguish this parfile from others...
+suffix = 'S4Giulio' # descriptor to distinguish this parfile from others...
 
-suffixCMB = suffix
-suffixLensing = suffix+'Born'
+suffixCMB = suffix+'BornRand'
+suffixCMBPhas = suffix
+suffixLensing = suffix+'BornRand'
 
 SIMDIR = opj(os.environ['SCRATCH'], 'n32', suffixCMB, 'cmbs')  # This is where the postborn are (or will be saved)
+lib_dir_CMB = opj(os.environ['SCRATCH'], 'n32', suffixCMBPhas, 'cmbs') #this is where I store phas, if already computed, for primordial CMB
 TEMP =  opj(os.environ['SCRATCH'], 'n32', suffixLensing, 'lenscarfrecs')
 
 fgs = 0.
@@ -107,9 +108,9 @@ for l in ll:
 ll = np.arange(0, len(cls_len['tt']), 1)
 cls_foregrounds = 0.
 
-lmax_ivf, mmax_ivf, beam, nlev_t, nlev_p = (3500, 3500, 1.7, 7., 7. * np.sqrt(2.))
+lmax_ivf, mmax_ivf, beam, nlev_t, nlev_p = (3500, 3500, 1., 1., 1. * np.sqrt(2.))
 
-lmin_tlm, lmin_elm, lmin_blm = (100, 100, 100) # The fiducial transfer functions are set to zero below these lmins
+lmin_tlm, lmin_elm, lmin_blm = (40, 40, 40) # The fiducial transfer functions are set to zero below these lmins
 # for delensing useful to cut much more B. It can also help since the cg inversion does not have to reconstruct those.
 
 lmax_phi, mmax_phi = (4000, 4000)
@@ -173,7 +174,9 @@ fixed_noise_index = 0 #this will allow to have always the same experimental nois
 lmax_cmb = 4096
 dlmax = 1024
 
-sims_cmb_len = SehgalSim(sims = SimsShegalDict, lib_dir = SIMDIR, lmax_cmb = lmax_cmb, cls_unl = cls_unl, dlmax = dlmax, lmin_dlm = 2)
+libPHASCMB = phas.lib_phas(os.path.join(lib_dir_CMB, 'phas'), 3, lmax_cmb + dlmax)
+
+sims_cmb_len = SehgalSim(sims = SimsShegalDict, lib_dir = SIMDIR, lmax_cmb = lmax_cmb, cls_unl = cls_unl, dlmax = dlmax, lmin_dlm = 2, lib_pha = libPHASCMB)
 sims      = simsit.cmb_maps_nlev_sehgal(sims_cmb_len = sims_cmb_len, cl_transf = transf_dat, 
                                 nlev_t = nlev_t, nlev_p = nlev_p, nside = nside, pix_lib_phas = pix_phas, zero_noise = zero_noise, fixed_noise_index = fixed_noise_index)
 
@@ -293,7 +296,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='test iterator full-sky with pert. resp.')
     parser.add_argument('-k', dest='k', type=str, default='p_p', help='rec. type')
     parser.add_argument('-itmax', dest='itmax', type=int, default=-1, help='maximal iter index')
-    parser.add_argument('-tol', dest='tol', type=float, default=7., help='-log10 of cg tolerance default')
+    parser.add_argument('-tol', dest='tol', type=float, default=5., help='-log10 of cg tolerance default')
     parser.add_argument('-imin', dest='imin', type=int, default=-1, help='minimal sim index')
     parser.add_argument('-imax', dest='imax', type=int, default=-1, help='maximal sim index')
     parser.add_argument('-v', dest='v', type=str, default='', help='iterator version')
