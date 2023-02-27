@@ -31,7 +31,7 @@ import itfgs.sims.sims_cmbs as simsit
 
 from plancklens.helpers import mpi
 
-suffix = 'fastSOGaussianOnly' # descriptor to distinguish this parfile from others...
+suffix = 'fastSOGaussianPerMode' # descriptor to distinguish this parfile from others...
 SIMDIR = opj(os.environ['SCRATCH'], 'n32', suffix, 'cmbs')  # This is where the postborn are (or will be saved)
 TEMP =  opj(os.environ['SCRATCH'], 'n32', suffix, 'lenscarfrecs')
 
@@ -40,15 +40,14 @@ TEMP =  opj(os.environ['SCRATCH'], 'n32', suffix, 'lenscarfrecs')
 homedir = os.environ['HOME'] 
 thloc = f'{homedir}/fgcmblensing/input/'
 allelementstosave = np.load(f'{thloc}input_cmb_145.npy')
-ells, lcmb, tsz, ksz, radio, cib, dust, nl145, totalcmb, totalnoisecmb = allelementstosave.T
-fgs = tsz+ksz+radio+cib+dust
+
 
 # Fiducial CMB spectra for QE and iterative reconstructions
 # (here we use slightly suboptimal lensed spectra QE weights)
 cls_path = opj(os.path.dirname(plancklens.__file__), 'data', 'clssehgal')
 cls_unl = utils.camb_clfile(opj(cls_path, 'Sehgal_lenspotentialCls.dat'))
 cls_len = utils.camb_clfile(opj(cls_path, '_lensedCls.dat'))
-cls_grad = utils.camb_clfile(opj(cls_path, '_camb_1.0.12_grads.dat'), grad_mode = True)
+cls_grad = utils.camb_clfile_sehgal(opj(cls_path, '_camb_1.0.12_grads.dat'), grad_mode = True)
 
 ll = [cls_unl, cls_len, cls_grad]
 for l in ll:
@@ -56,7 +55,7 @@ for l in ll:
         l[k] = np.nan_to_num(v)
 
 ll = np.arange(0, len(cls_len['tt']), 1)
-cls_foregrounds = np.interp(ll, ells, fgs)
+cls_foregrounds = 0.#np.interp(ll, ells, fgs)
 
 lmax_ivf, mmax_ivf, beam, nlev_t, nlev_p = (3500, 3500, 1.7, 7., 7. * np.sqrt(2.))
 
@@ -80,10 +79,13 @@ lenjob_pbgeometry =utils_scarf.pbdGeometry(lenjob_geometry, utils_scarf.pbounds(
 lensres = 0.7  # Deflection operations will be performed at this resolution
 Lmin = 2 # The reconstruction of all lensing multipoles below that will not be attempted
 
-step_val = np.arange(0, Alm.getsize(lmax_qlm, mmax_qlm), 1) # The size of the steps in the MAP BFGS iterative search
-Lcut = 30
-step_val = 0.5*(step_val>Lcut)
-stepper = steps.nrstep(lmax_qlm, mmax_qlm, val=step_val) # handler of the size steps in the MAP BFGS iterative search
+#step_val = np.arange(0, Alm.getsize(lmax_qlm, mmax_qlm), 1) # The size of the steps in the MAP BFGS iterative search
+step_val = np.arange(0, lmax_qlm+1, 1)
+Lcut = 200
+#suppress = lambda l, lsup, supindex: 1-np.exp(-1.0*np.power(l/lsup, supindex))
+#step_val =  suppress(step_val, Lcut, 5)#
+step_val = 0.5*(step_val>Lcut) #smoothed
+stepper = steps.nrsteppermode(lmax_qlm, mmax_qlm, val=step_val) # handler of the size steps in the MAP BFGS iterative search
 mc_sims_mf_it0 = np.array([]) # sims to use to build the very first iteration mean-field (QE mean-field) Here 0 since idealized
 
 
@@ -101,7 +103,7 @@ transf_blm   =  gauss_beam(beam/180 / 60 * np.pi, lmax=lmax_ivf) * (np.arange(lm
 transf_d = {'t':transf_tlm, 'e':transf_elm, 'b':transf_blm}
 
 ll = np.arange(0, len(cls_len['tt']), 1)
-fgs = np.interp(ll, ells, fgs)[:lmax_ivf + 1]*0.
+fgs = 0.#np.interp(ll, ells, fgs)[:lmax_ivf + 1]*0.
 
 # Isotropic approximation to the filtering (used eg for response calculations)
 ftl =  cli(cls_len['tt'][:lmax_ivf + 1] + (nlev_t / 180 / 60 * np.pi) ** 2 * cli(transf_tlm ** 2) + fgs) * (transf_tlm > 0)

@@ -218,23 +218,40 @@ class sims_cmb_len(object):
     def get_sim_plm(self, idx):
         index = self.offset_index(idx, self.offset_plm[0], self.offset_plm[1])
         try:
+            print('Reading saved Gaussian CMB lensing potential sim')
             pfname = os.path.join(self.lib_dir, 'sim_%04d_plm.fits' % index)
             return hp.read_alm(pfname)
         except:
             return self.unlcmbs.get_sim_plm(index)
 
     def get_sim_olm(self, idx):
-        return self.unlcmbs.get_sim_olm(idx)
+        if 'o' in self.fields:
+            return self.unlcmbs.get_sim_olm(idx)
+        else:
+            return np.zeros_like(self.get_sim_plm(idx))
 
+    def _get_dlm(self, idx):
+        dlm = self.get_sim_plm(idx)
+        dclm = self.get_sim_olm(idx) # curl mode
+        lmax_dlm = hp.Alm.getlmax(dlm.size, -1)
+        mmax_dlm = lmax_dlm
+        # potentials to deflection
+        p2d = np.sqrt(np.arange(lmax_dlm + 1, dtype=float) * np.arange(1, lmax_dlm + 2, dtype=float))
+        p2d[:self.lmin_dlm] = 0
+        hp.almxfl(dlm, p2d, mmax_dlm, inplace=True)
+        hp.almxfl(dclm, p2d, mmax_dlm, inplace=True)
+        return dlm, dclm, lmax_dlm, mmax_dlm
+    
+    
     def _cache_eblm(self, idx):
         elm = self.unlcmbs.get_sim_elm(self.offset_index(idx, self.offset_cmb[0], self.offset_cmb[1]))
         blm = None if 'b' not in self.fields else self.unlcmbs.get_sim_blm(self.offset_index(idx, self.offset_cmb[0], self.offset_cmb[1]))
-        dlm = self.get_sim_plm(idx)
+        dlm, dclm, _, _ = self._get_dlm(idx)
         assert 'o' not in self.fields, 'not implemented'
 
         lmaxd = hp.Alm.getlmax(dlm.size)
-        hp.almxfl(dlm, np.sqrt(np.arange(lmaxd + 1, dtype=float) * np.arange(1, lmaxd + 2)), inplace=True)
-        Qlen, Ulen = self.lens_module.alm2lenmap_spin([elm, blm], [dlm, None], self.nside_lens, 2,
+        #hp.almxfl(dlm, np.sqrt(np.arange(lmaxd + 1, dtype=float) * np.arange(1, lmaxd + 2)), inplace=True)
+        Qlen, Ulen = self.lens_module.alm2lenmap_spin([elm, blm], [dlm, dclm], self.nside_lens, 2,
                                                 nband=self.nbands, facres=self.facres, verbose=self.verbose)
         elm, blm = hp.map2alm_spin([Qlen, Ulen], 2, lmax=self.lmax)
         del Qlen, Ulen
@@ -253,6 +270,8 @@ class sims_cmb_len(object):
             dlm = self.get_sim_plm(idx)
             plm = dlm.copy()
             
+            #dlm, dclm, _, _ = self._get_dlm(idx)
+
             assert 'o' not in self.fields, 'not implemented'
 
             lmaxd = hp.Alm.getlmax(dlm.size)

@@ -4,9 +4,9 @@ Iterative reconstruction for CMB data.
 
 Minimal example for TT only data.
 
-Giulio sims map0_kappa_ecp262_dmn2_lmax8000.fits
+Giulio sims map0_kappa_ecp262_dmn2_lmax8000_first.fits
 
-with Post-Born and non-linear effects
+with Born approx and non linear effects
 
 """
 
@@ -34,6 +34,8 @@ import itfgs.sims.sims_cmbs as simsit
 
 from plancklens.helpers import mpi
 
+
+
 def camb_clfile_gradient(fname, lmax=None):
     """CAMB spectra (lenspotentialCls, lensedCls or tensCls types) returned as a dict of numpy arrays.
     Args:
@@ -58,7 +60,7 @@ baseSehgal = opj(os.environ['SCRATCH'], 'SKYSIMS/GIULIOSIMS/')
 #baseSehgal = opj(os.environ['SCRATCH'], 'SehgalSims')
 
 SimsShegalDict = {}
-SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'bornGaussian/born_kappa_gauss_{idx}.fits')
+SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'lognormal_first.fits')
 
 names = ['']
 SimsShegalDict[0] = [lambda idx: opj(baseSehgal, nome) for nome in names]
@@ -82,12 +84,12 @@ class SehgalSim(sims_postborn):
 
 suffix = 'S4Giuliolminrec40new' # descriptor to distinguish this parfile from others...
 
-suffixCMB = suffix+'BornGauss'
+suffixCMB = suffix+'Lognormal'
 suffixCMBPhas = suffix
-suffixLensing = suffix+'BornGauss'
+suffixLensing = suffix+'Lognormal'
 
 SIMDIR = opj(os.environ['SCRATCH'], 'n32', suffixCMB, 'cmbs')  # This is where the postborn are (or will be saved)
-lib_dir_CMB = opj(os.environ['SCRATCH'], 'n32', suffixCMBPhas, 'cmbs') #this is where I store phas, if already computed
+lib_dir_CMB = opj(os.environ['SCRATCH'], 'n32', suffixCMBPhas, 'cmbs') #this is where I store phas, if already computed, for primordial CMB
 TEMP =  opj(os.environ['SCRATCH'], 'n32', suffixLensing, 'lenscarfrecs')
 
 fgs = 0.
@@ -119,7 +121,7 @@ lmax_unl, mmax_unl = (4500, 4500) # Delensed CMB is reconstructed down to this l
 
 
 #----------------- pixelization and geometry info for the input maps and the MAP pipeline and for lensing operations
-nside = 4096
+nside = 4096 #CHECK
 zbounds     = (-1.,1.) # colatitude sky cuts for noise variance maps (We could exclude all rings which are completely masked)
 ninvjob_geometry = utils_scarf.Geom.get_healpix_geometry(nside, zbounds=zbounds)
 
@@ -173,9 +175,7 @@ fixed_noise_index = 0 #this will allow to have always the same experimental nois
 lmax_cmb = 4096
 dlmax = 1024
 
-libPHASCMB = phas.lib_phas(os.path.join(lib_dir_CMB, 'phas'), 3, lmax_cmb + dlmax)
-
-sims_cmb_len = SehgalSim(sims = SimsShegalDict, lib_dir = SIMDIR, lmax_cmb = lmax_cmb, cls_unl = cls_unl, dlmax = dlmax, lmin_dlm = 2, lib_pha = libPHASCMB)
+sims_cmb_len = SehgalSim(sims = SimsShegalDict, lib_dir = SIMDIR, lmax_cmb = lmax_cmb, cls_unl = cls_unl, dlmax = dlmax, lmin_dlm = 2)
 sims      = simsit.cmb_maps_nlev_sehgal(sims_cmb_len = sims_cmb_len, cl_transf = transf_dat, 
                                 nlev_t = nlev_t, nlev_p = nlev_p, nside = nside, pix_lib_phas = pix_phas, zero_noise = zero_noise, fixed_noise_index = fixed_noise_index)
 
@@ -295,7 +295,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='test iterator full-sky with pert. resp.')
     parser.add_argument('-k', dest='k', type=str, default='p_p', help='rec. type')
     parser.add_argument('-itmax', dest='itmax', type=int, default=-1, help='maximal iter index')
-    parser.add_argument('-tol', dest='tol', type=float, default=5., help='-log10 of cg tolerance default')
+    parser.add_argument('-tol', dest='tol', type=float, default=7., help='-log10 of cg tolerance default')
     parser.add_argument('-imin', dest='imin', type=int, default=-1, help='minimal sim index')
     parser.add_argument('-imax', dest='imax', type=int, default=-1, help='maximal sim index')
     parser.add_argument('-v', dest='v', type=str, default='', help='iterator version')

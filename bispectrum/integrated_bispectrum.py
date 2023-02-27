@@ -62,6 +62,10 @@ PKlin = camb.get_matter_power_interpolator(pars, nonlinear = False,
     hubble_units = False, k_hunit = False, kmax = kmax, k_per_logint = None,
     var1 = 'delta_nonu', var2 = 'delta_nonu', zmax = zs[-1])
 
+ksaving = np.logspace(-5, 2, 1000)
+zsaving = np.append(0, np.logspace(-5, 3, 1000))
+
+
 zm = np.logspace(-9, np.log(1089), 140)
 zm = np.append(0, zm)
 pars.set_matter_power(redshifts = zm, kmax = kmax)
@@ -69,6 +73,10 @@ pars.set_matter_power(redshifts = zm, kmax = kmax)
 results = camb.get_results(pars)
 
 s8 = np.array(results.get_sigma8())
+
+np.save('matterpower', {'z': zsaving, 'k': ksaving, 'P': PK.P(zsaving, ksaving)})
+np.save('matterpowerlin', {'z': zsaving, 'k': ksaving, 'P': PKlin.P(zsaving, ksaving)})
+np.savetxt('sigma8.txt', np.c_[zm, s8])
 
 Q = lambda x: (4-2**x)/(1+2**(x+1))
  
@@ -83,6 +91,7 @@ for z in zs:
     kNLz.append(kstar)
 
 kNLzf = interp.interp1d(zs, kNLz, kind = 'cubic', fill_value = 'extrapolate')
+np.savetxt('kNL.txt', np.c_[zs, kNLz])
 
 import findiff
 kgrid = np.log(np.logspace(-5, 2, 1000))
@@ -110,6 +119,8 @@ for i, Pgrid_ in enumerate(Pgrid):
     #neff2D += [neff]
 
 neff2D = np.array(neff2D)
+
+np.save('neff', {'z': zgrid, 'k': ksneff, 'n': neff2D})
 
 nefff_ = interp.RectBivariateSpline(zgrid, np.exp(kgrid), neff2D)
 nefff = lambda z, k: nefff_(z, k, grid = False)
@@ -211,9 +222,13 @@ def bispectrum_matter(k1, k2, k3, theta12, theta13, theta23, z, model = 'TR'):
     return sum([2*F2ptker_vector(ksvec[comb[0]], ksvec[comb[1]], thetaij, z, model = model)*P(z, ksvec[comb[0]], grid = False)*P(z, ksvec[comb[1]], grid = False) for comb, thetaij in zip(combinations, thetas)])
 
 aofchis = 1/(1+zs)
+np.savetxt('aofchis.txt', np.c_[chis, aofchis])
+np.savetxt('zs.txt', np.c_[chis, zs])
+
 zofchi = interp.interp1d(chis, zs, kind='cubic', fill_value='extrapolate', bounds_error=False)
 
 Wkk = windows.cmblensingwindow_ofchi(chis, aofchis, H0, Omegam, interp1d = True, chistar = chistar)
+np.savetxt('Wkk.txt', np.c_[chis, Wkk(chis)])
 
 Wphiphiv = np.nan_to_num(-2*(chistar-chis)/(chistar*chis))
 Wphiphiv[0] = 0

@@ -26,9 +26,12 @@ class sims_postborn(sims_cmbs.sims_cmb_len):
             lmax_cmb: cmb maps are generated down to this max multipole
             cls_unl: dictionary of unlensed CMB spectra
             dlmax, nside_lens, facres, nbands: lenspyx lensing module parameters
+            wcurl: include field rotation map in the lensing deflection (default to False for historical reasons)
+
+
         This just redefines the sims_cmbs.sims_cmb_len method to feed the nonlinear kmap
     """
-    def __init__(self, lib_dir, lmax_cmb, cls_unl:dict,
+    def __init__(self, lib_dir, lmax_cmb, cls_unl:dict, wcurl = False,
                  dlmax=1024, lmin_dlm = 2, nside_lens=4096, facres=0, nbands=8, cache_plm=True, lib_pha = None):
 
         lmax_plm = lmax_cmb + dlmax
@@ -38,6 +41,7 @@ class sims_postborn(sims_cmbs.sims_cmb_len):
         for k in cls_unl.keys():
             if 'p' not in k :
                 cmb_cls[k] = np.copy(cls_unl[k][:lmax_cmb + dlmax + 1])
+        self.wcurl = wcurl
         self.lmax_plm = lmax_plm
         self.mmax_plm = mmax_plm
         self.cache_plm = cache_plm
@@ -45,6 +49,9 @@ class sims_postborn(sims_cmbs.sims_cmb_len):
                                             dlmax=dlmax, nside_lens=nside_lens, facres=facres, nbands=nbands, lmin_dlm = lmin_dlm, lib_pha = lib_pha)
 
     def get_sim_kappa(self, idx: int):
+        pass
+
+    def get_sim_omega(self, idx: int):
         pass
 
     def get_sim_plm(self, idx: int):
@@ -55,6 +62,21 @@ class sims_postborn(sims_cmbs.sims_cmb_len):
             p2k = 0.5 * np.arange(self.lmax_plm + 1) * np.arange(1, self.lmax_plm + 2, dtype=float)
             #plm = utils_hp.almxfl(hp.map2alm(hp.read_map(self.path, dtype=float), lmax=self.lmax_plm), utils.cli(p2k), self.mmax_plm, False)
             plm = utils_hp.almxfl(hp.map2alm(self.get_sim_kappa(idx), lmax = self.lmax_plm), utils.cli(p2k), self.mmax_plm, False)
+            if self.cache_plm:
+                hp.write_alm(fn, plm)
+            return plm
+        print('Reading saved CMB lensing potential sim')
+        return hp.read_alm(fn)
+
+    def get_sim_olm(self, idx):
+        fn = os.path.join(self.lib_dir, f'olm_in_{idx}_lmax{self.lmax_plm}.fits')
+        
+        if (not self.wcurl):
+            return np.zeros_like(self.get_sim_plm(idx))
+
+        if not os.path.exists(fn):
+            p2k = 0.5 * np.arange(self.lmax_plm + 1) * np.arange(1, self.lmax_plm + 2, dtype=float)
+            plm = utils_hp.almxfl(hp.map2alm(self.get_sim_omega(idx), lmax=self.lmax_plm), utils.cli(p2k), self.mmax_plm, False)
             if self.cache_plm:
                 hp.write_alm(fn, plm)
             return plm
