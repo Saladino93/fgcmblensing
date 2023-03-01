@@ -5,6 +5,9 @@ from scipy import interpolate as interp, integrate as sinteg
 import itertools
 from angularcls import windows, cosmoconstants
 
+import pathlib
+
+outpath = pathlib.Path("products")
 
 nz = 6000 #number of steps to use for the radial/redshift integration
 kmax = 100  #kmax to use
@@ -66,17 +69,19 @@ ksaving = np.logspace(-5, 2, 1000)
 zsaving = np.append(0, np.logspace(-5, 3, 1000))
 
 
-zm = np.logspace(-9, np.log(1089), 140)
+zm = np.logspace(-9, np.log10(1089), 140)
 zm = np.append(0, zm)
 pars.set_matter_power(redshifts = zm, kmax = kmax)
 
 results = camb.get_results(pars)
 
-s8 = np.array(results.get_sigma8())
+s8 = np.array(results.get_sigma8()[::-1])
 
-np.save('matterpower', {'z': zsaving, 'k': ksaving, 'P': PK.P(zsaving, ksaving)})
-np.save('matterpowerlin', {'z': zsaving, 'k': ksaving, 'P': PKlin.P(zsaving, ksaving)})
-np.savetxt('sigma8.txt', np.c_[zm, s8])
+np.savetxt(outpath/'matterpower_z.txt', zsaving)
+np.savetxt(outpath/'matterpower_k.txt', ksaving)
+np.savetxt(outpath/'matterpower_P.txt', PK.P(zsaving, ksaving))
+np.savetxt(outpath/'matterpower_Plin.txt', PKlin.P(zsaving, ksaving))
+np.savetxt(outpath/'sigma8.txt', np.c_[zm, s8])
 
 Q = lambda x: (4-2**x)/(1+2**(x+1))
  
@@ -91,7 +96,7 @@ for z in zs:
     kNLz.append(kstar)
 
 kNLzf = interp.interp1d(zs, kNLz, kind = 'cubic', fill_value = 'extrapolate')
-np.savetxt('kNL.txt', np.c_[zs, kNLz])
+np.savetxt(outpath/'kNL.txt', np.c_[zs, kNLz])
 
 import findiff
 kgrid = np.log(np.logspace(-5, 2, 1000))
@@ -120,7 +125,10 @@ for i, Pgrid_ in enumerate(Pgrid):
 
 neff2D = np.array(neff2D)
 
-np.save('neff', {'z': zgrid, 'k': ksneff, 'n': neff2D})
+np.savetxt(outpath/'neff_z.txt', zgrid)
+np.savetxt(outpath/'neff_k.txt', ksneff)
+np.savetxt(outpath/'neff.txt', neff2D)
+
 
 nefff_ = interp.RectBivariateSpline(zgrid, np.exp(kgrid), neff2D)
 nefff = lambda z, k: nefff_(z, k, grid = False)
@@ -174,6 +182,9 @@ fit_funcs = {}
 for model in ['GM', 'SC']:
     fit_funcs[model] = [interp.RectBivariateSpline(zm, ks, fun(zmmesh, ksmesh)) for fun in get_afuncs_form_coeffs_for_interp(model)]
 
+#fit_funcs_alt = {}
+#for model in ['GM', 'SC']:
+#    fit_funcs_alt[model] = [interp.RegularGridInterpolator((zm, ks), fun(zmmesh, ksmesh)) for fun in get_afuncs_form_coeffs_for_interp(model)]
 
 def get_afuncs_form_coeffs(model):
     return fit_funcs[model]
@@ -214,21 +225,28 @@ def F2ptker_vector(k1, k2, theta12, z, model = 'TR'):
     return resultG + resultS + resultT
 
 
-P = PK.P
+P = PK.P #memoize?
+#avoid recomputing the same things
+#prefactors or memoization?
 def bispectrum_matter(k1, k2, k3, theta12, theta13, theta23, z, model = 'TR'):
     ksvec = [k1, k2, k3]
     combinations = list(itertools.combinations([0,1,2], 2))
     thetas = [theta12, theta13, theta23] #assume this is the order too from combinations
     return sum([2*F2ptker_vector(ksvec[comb[0]], ksvec[comb[1]], thetaij, z, model = model)*P(z, ksvec[comb[0]], grid = False)*P(z, ksvec[comb[1]], grid = False) for comb, thetaij in zip(combinations, thetas)])
 
+#vectorized for P?
+def bispectrum_matter_2(k1, k2, k3, theta12, theta13, theta23, z, model = 'TR'):
+    result = 2*(F2ptker_vector(k1, k2, thet12, z, model = model)*P(z, k1, grid = False)*P(z, k2, grid = False))
+
+
 aofchis = 1/(1+zs)
-np.savetxt('aofchis.txt', np.c_[chis, aofchis])
-np.savetxt('zs.txt', np.c_[chis, zs])
+np.savetxt(outpath/'aofchis.txt', np.c_[chis, aofchis])
+np.savetxt(outpath/'zs.txt', np.c_[chis, zs])
 
 zofchi = interp.interp1d(chis, zs, kind='cubic', fill_value='extrapolate', bounds_error=False)
 
 Wkk = windows.cmblensingwindow_ofchi(chis, aofchis, H0, Omegam, interp1d = True, chistar = chistar)
-np.savetxt('Wkk.txt', np.c_[chis, Wkk(chis)])
+np.savetxt(outpath/'Wkk.txt', np.c_[chis, Wkk(chis)])
 
 Wphiphiv = np.nan_to_num(-2*(chistar-chis)/(chistar*chis))
 Wphiphiv[0] = 0
