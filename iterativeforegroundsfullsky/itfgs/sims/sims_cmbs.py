@@ -46,13 +46,17 @@ class sims_cmb_unlensed(object):
             os.makedirs(lib_dir)
         mpi.barrier()
         fields = _get_fields(cls_unl)
-
-        if lib_pha is None and mpi.rank == 0:
-            lib_pha = phas.lib_phas(os.path.join(lib_dir, 'phas'), len(fields), lmax + dlmax)
-        elif lib_pha is not None:
-            print('Using specified lib_pha!')
-        #else:  # Check that the lib_alms are compatible :
-        #    assert lib_pha.lmax == lmax + dlmax
+        
+        phas_path = lib_dir #os.path.join(lib_dir, 'phas')
+        
+        if mpi.rank == 0:
+            if lib_pha is None:
+                # lib_pha = phas.lib_phas(os.path.join(lib_dir, 'phas'), len(fields), lmax + dlmax)
+                lib_pha = phas.lib_phas(phas_path, len(fields), lmax + dlmax)
+            else:  # Check that the lib_alms are compatible :
+                assert lib_pha.lmax == lmax + dlmax
+        # lib_pha = phas.lib_phas(os.path.join(lib_dir, 'phas'), len(fields), lmax + dlmax)
+        lib_pha = phas.lib_phas(phas_path, len(fields), lmax + dlmax)
         mpi.barrier()
 
 
@@ -147,16 +151,21 @@ class sims_cmb_len(object):
             os.makedirs(lib_dir)
         mpi.barrier()
         fields = _get_fields(cls_unl)
+        print('Number of fields', len(fields))
 
-        if lib_pha is None and mpi.rank == 0:
-            lib_pha = phas.lib_phas(os.path.join(lib_dir, 'phas'), len(fields), lmax + dlmax)
-        else:  # Check that the lib_alms are compatible :
-            if lib_pha is not None:
+        phas_path = lib_dir #os.path.join(lib_dir, 'cmbphas')
+        
+        if mpi.rank == 0:
+            if lib_pha is None:
+                # lib_pha = phas.lib_phas(os.path.join(lib_dir, 'phas'), len(fields), lmax + dlmax)
+                lib_pha = phas.lib_phas(phas_path, len(fields), lmax + dlmax)
+            else:  # Check that the lib_alms are compatible :
+                print("Checking input pha")
                 assert lib_pha.lmax == lmax + dlmax
+        # lib_pha = phas.lib_phas(os.path.join(lib_dir, 'phas'), len(fields), lmax + dlmax)
+        #lib_pha = phas.lib_phas(phas_path, len(fields), lmax + dlmax)
         mpi.barrier()
 
-        if lib_pha is None:
-            lib_pha = phas.lib_phas(os.path.join(lib_dir, 'phas'), len(fields), lmax + dlmax)
 
         self.lmin_dlm = lmin_dlm
 
@@ -169,7 +178,7 @@ class sims_cmb_len(object):
 
         self.unlcmbs = cmbs.sims_cmb_unl(cls_unl, lib_pha)
         self.lib_dir = lib_dir
-        self.fields = _get_fields(cls_unl)
+        self.fields = fields
 
         self.offset_plm = offsets_plm if offsets_plm is not None else (1, 0)
         self.offset_cmb = offsets_cmbunl if offsets_cmbunl is not None else (1, 0)
@@ -266,6 +275,7 @@ class sims_cmb_len(object):
         pfname = os.path.join(self.lib_dir, 'sim_%04d_plm.fits' % idx)
 
         if not os.path.exists(fname):
+            print('Generating new CMB')
             tlm = self.unlcmbs.get_sim_tlm(self.offset_index(idx, self.offset_cmb[0], self.offset_cmb[1]))
             dlm = self.get_sim_plm(idx)
             plm = dlm.copy()
@@ -323,3 +333,46 @@ class cmb_maps_nlev_sehgal(maps.cmb_maps_nlev):
         if self.zero_noise:
             print('Setting noise sim to zero!')
         return (1-self.zero_noise)*self.nlev_t / vamin * self.pix_lib_phas.get_sim(idx, idf = 0)
+    
+    
+    def get_sim_tnoise(self, idx):
+        """Returns noise temperature map for a simulation
+
+            Args:
+                idx: simulation index
+
+            Returns:
+                healpy map
+
+        """
+        idx = self.fixed_noise_index if self.fixed_noise_index is not None else idx
+        print(f'Noise index is {idx}')
+        vamin = np.sqrt(hp.nside2pixarea(self.nside, degrees=True)) * 60
+        if self.zero_noise:
+            print('Setting noise sim to zero!')
+        return (1-self.zero_noise)*self.nlev_t / vamin * self.pix_lib_phas.get_sim(idx, idf = 0)
+    
+    
+    def get_sim_qnoise(self, idx):
+        """Returns noise Q-polarization map for a simulation
+            Args:
+                idx: simulation index
+            Returns:
+                healpy map
+        """
+        idx = self.fixed_noise_index if self.fixed_noise_index is not None else idx
+        print(f'Noise index is {idx}')
+        vamin = np.sqrt(hp.nside2pixarea(self.nside, degrees=True)) * 60
+        return self.nlev_p / vamin * self.pix_lib_phas.get_sim(idx, idf=1)
+
+    def get_sim_unoise(self, idx):
+        """Returns noise U-polarization map for a simulation
+            Args:
+                idx: simulation index
+            Returns:
+                healpy map
+        """
+        idx = self.fixed_noise_index if self.fixed_noise_index is not None else idx
+        print(f'Noise index is {idx}')
+        vamin = np.sqrt(hp.nside2pixarea(self.nside, degrees=True)) * 60
+        return self.nlev_p / vamin * self.pix_lib_phas.get_sim(idx, idf=2)

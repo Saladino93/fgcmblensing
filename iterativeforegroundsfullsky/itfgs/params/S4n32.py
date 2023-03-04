@@ -27,6 +27,7 @@ from lenscarf.iterators import cs_iterator as scarf_iterator, steps
 from lenscarf.utils import cli
 from lenscarf.utils_hp import gauss_beam, almxfl, alm_copy
 from lenscarf.opfilt.opfilt_iso_tt_wl import alm_filter_nlev_wl as alm_filter_tt_wl
+from lenscarf.opfilt.opfilt_iso_ee_wl import alm_filter_nlev_wl as alm_filter_ee_wl
 
 import itfgs
 from itfgs.sims.sims_postborn import sims_postborn
@@ -82,7 +83,7 @@ class SehgalSim(sims_postborn):
 
 
 
-suffix = 'S4Giuliolminrec40new' # descriptor to distinguish this parfile from others...
+suffix = 'S4Check' # descriptor to distinguish this parfile from others...
 
 suffixCMB = suffix
 suffixLensing = suffix+'Born'
@@ -109,7 +110,7 @@ cls_foregrounds = 0.
 
 lmax_ivf, mmax_ivf, beam, nlev_t, nlev_p = (4000, 4000, 1., 1., 1. * np.sqrt(2.))
 
-lmin_tlm, lmin_elm, lmin_blm = (40, 40, 40) # The fiducial transfer functions are set to zero below these lmins
+lmin_tlm, lmin_elm, lmin_blm = (10, 10, 10) # The fiducial transfer functions are set to zero below these lmins
 # for delensing useful to cut much more B. It can also help since the cg inversion does not have to reconstruct those.
 
 lmax_phi, mmax_phi = (4500, 4500)
@@ -230,7 +231,7 @@ def get_itlib(k:str, simidx:int, version:str, cg_tol:float):
     if simidx in mf_sims:  # We dont want to include the sim we consider in the mean-field...
         Nmf = len(mf_sims)
         mf0 = (mf0 - qlms_dd.get_sim_qlm(k, int(simidx)) / Nmf) * (Nmf / (Nmf - 1))
-
+    
     path_plm0 = opj(libdir_iterator, 'phi_plm_it000.npy')
     path_plm0_QE_norm = opj(libdir_iterator, 'normalized_phi_plm_it000.npy')
     if not os.path.exists(path_plm0):
@@ -279,7 +280,8 @@ def get_itlib(k:str, simidx:int, version:str, cg_tol:float):
         # dat maps must now be given in harmonic space in this idealized configuration
         datmaps = np.array(sht_job.map2alm_spin(sims_MAP.get_sim_pmap(int(simidx)), 2))
     else:
-        assert 0
+        return None
+        #assert 0
     k_geom = filtr.ffi.geom # Customizable Geometry for position-space operations in calculations of the iterated QEs etc
     # Sets to zero all L-modes below Lmin in the iterations:
     #NOTE: IS USING THE R_UNL RESPONSE TO OBTAIN ~ (1/Cpp + 1/N0)^-1 OK as first response?
@@ -316,11 +318,12 @@ if __name__ == '__main__':
         lib_dir_iterator = libdir_iterators(args.k, idx, args.v)
         if args.itmax >= 0 and Rec.maxiterdone(lib_dir_iterator) < args.itmax:
             itlib = get_itlib(args.k, idx, args.v, 1.)
-            for i in range(args.itmax + 1):
-                print("****Iterator: setting cg-tol to %.4e ****"%tol_iter(i))
-                print("****Iterator: setting solcond to %s ****"%soltn_cond(i))
+            if itlib is not None:
+                for i in range(args.itmax + 1):
+                    print("****Iterator: setting cg-tol to %.4e ****"%tol_iter(i))
+                    print("****Iterator: setting solcond to %s ****"%soltn_cond(i))
 
-                itlib.chain_descr  = chain_descrs(lmax_unl, tol_iter(i))
-                itlib.soltn_cond   = soltn_cond(i)
-                print("doing iter " + str(i))
-                itlib.iterate(i, 'p')
+                    itlib.chain_descr  = chain_descrs(lmax_unl, tol_iter(i))
+                    itlib.soltn_cond   = soltn_cond(i)
+                    print("doing iter " + str(i))
+                    itlib.iterate(i, 'p')

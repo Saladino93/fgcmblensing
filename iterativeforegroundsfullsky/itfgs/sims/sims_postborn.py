@@ -65,7 +65,7 @@ class sims_postborn(sims_cmbs.sims_cmb_len):
             if self.cache_plm:
                 hp.write_alm(fn, plm)
             return plm
-        print('Reading saved CMB lensing potential sim')
+        #print('Reading saved CMB lensing potential sim')
         return hp.read_alm(fn)
 
     def get_sim_olm(self, idx):

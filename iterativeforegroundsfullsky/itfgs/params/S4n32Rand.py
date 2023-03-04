@@ -27,6 +27,7 @@ from lenscarf.iterators import cs_iterator as scarf_iterator, steps
 from lenscarf.utils import cli
 from lenscarf.utils_hp import gauss_beam, almxfl, alm_copy
 from lenscarf.opfilt.opfilt_iso_tt_wl import alm_filter_nlev_wl as alm_filter_tt_wl
+from lenscarf.opfilt.opfilt_iso_ee_wl import alm_filter_nlev_wl as alm_filter_ee_wl
 
 import itfgs
 from itfgs.sims.sims_postborn import sims_postborn
@@ -81,7 +82,7 @@ class SehgalSim(sims_postborn):
 
 
 
-suffix = 'S4Giulio' # descriptor to distinguish this parfile from others...
+suffix = 'S4Check' # descriptor to distinguish this parfile from others...
 
 suffixCMB = suffix+'BornRand'
 suffixCMBPhas = suffix
@@ -108,15 +109,15 @@ for l in ll:
 ll = np.arange(0, len(cls_len['tt']), 1)
 cls_foregrounds = 0.
 
-lmax_ivf, mmax_ivf, beam, nlev_t, nlev_p = (3500, 3500, 1., 1., 1. * np.sqrt(2.))
+lmax_ivf, mmax_ivf, beam, nlev_t, nlev_p = (4000, 4000, 1., 1., 1. * np.sqrt(2.))
 
-lmin_tlm, lmin_elm, lmin_blm = (40, 40, 40) # The fiducial transfer functions are set to zero below these lmins
+lmin_tlm, lmin_elm, lmin_blm = (10, 10, 10) # The fiducial transfer functions are set to zero below these lmins
 # for delensing useful to cut much more B. It can also help since the cg inversion does not have to reconstruct those.
 
-lmax_phi, mmax_phi = (4000, 4000)
+lmax_phi, mmax_phi = (4500, 4500)
 lmax_qlm, mmax_qlm = (lmax_phi, mmax_phi) # Lensing map is reconstructed down to this lmax and mmax
 # NB: the QEs from plancklens does not support mmax != lmax, but the MAP pipeline does
-lmax_unl, mmax_unl = (4000, 4000) # Delensed CMB is reconstructed down to this lmax and mmax
+lmax_unl, mmax_unl = (4500, 4500) # Delensed CMB is reconstructed down to this lmax and mmax
 
 
 #----------------- pixelization and geometry info for the input maps and the MAP pipeline and for lensing operations
@@ -174,7 +175,7 @@ fixed_noise_index = 0 #this will allow to have always the same experimental nois
 lmax_cmb = 4096
 dlmax = 1024
 
-libPHASCMB = phas.lib_phas(os.path.join(lib_dir_CMB, 'phas'), 3, lmax_cmb + dlmax)
+libPHASCMB = phas.lib_phas(os.path.join(lib_dir_CMB), 3, lmax_cmb + dlmax)
 
 sims_cmb_len = SehgalSim(sims = SimsShegalDict, lib_dir = SIMDIR, lmax_cmb = lmax_cmb, cls_unl = cls_unl, dlmax = dlmax, lmin_dlm = 2, lib_pha = libPHASCMB)
 sims      = simsit.cmb_maps_nlev_sehgal(sims_cmb_len = sims_cmb_len, cl_transf = transf_dat, 
@@ -282,7 +283,8 @@ def get_itlib(k:str, simidx:int, version:str, cg_tol:float):
         # dat maps must now be given in harmonic space in this idealized configuration
         datmaps = np.array(sht_job.map2alm_spin(sims_MAP.get_sim_pmap(int(simidx)), 2))
     else:
-        assert 0
+        return None
+        #assert 0
     k_geom = filtr.ffi.geom # Customizable Geometry for position-space operations in calculations of the iterated QEs etc
     # Sets to zero all L-modes below Lmin in the iterations:
     #NOTE: IS USING THE R_UNL RESPONSE TO OBTAIN ~ (1/Cpp + 1/N0)^-1 OK as first response?
@@ -319,11 +321,12 @@ if __name__ == '__main__':
         lib_dir_iterator = libdir_iterators(args.k, idx, args.v)
         if args.itmax >= 0 and Rec.maxiterdone(lib_dir_iterator) < args.itmax:
             itlib = get_itlib(args.k, idx, args.v, 1.)
-            for i in range(args.itmax + 1):
-                print("****Iterator: setting cg-tol to %.4e ****"%tol_iter(i))
-                print("****Iterator: setting solcond to %s ****"%soltn_cond(i))
+            if itlib is not None:
+                for i in range(args.itmax + 1):
+                    print("****Iterator: setting cg-tol to %.4e ****"%tol_iter(i))
+                    print("****Iterator: setting solcond to %s ****"%soltn_cond(i))
 
-                itlib.chain_descr  = chain_descrs(lmax_unl, tol_iter(i))
-                itlib.soltn_cond   = soltn_cond(i)
-                print("doing iter " + str(i))
-                itlib.iterate(i, 'p')
+                    itlib.chain_descr  = chain_descrs(lmax_unl, tol_iter(i))
+                    itlib.soltn_cond   = soltn_cond(i)
+                    print("doing iter " + str(i))
+                    itlib.iterate(i, 'p')
