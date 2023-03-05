@@ -1,6 +1,6 @@
 import interpolated_quantities_numba as iqn
 
-from numba import jit
+from numba import jit, prange, vectorize, float64, int64
 
 import numpy as np
 
@@ -216,12 +216,14 @@ def integrate_bispectrum_kkk_TR_scipy(l1, l2, l3, angle12, angle13, angle23):
         return chi**(-4)*iqn.Wkk(chi)**3*bispectrum_matter_TR(l1/chi, l2/chi, l3/chi, angle12, angle13, angle23, iqn.zofchi(chi))
     return sinteg.quadrature(bispectrum_at_ells_of_chi, 0, chistar, miniter = 10, maxiter = 50, rtol = 1e-8)[0]
 
+
 #get points and weights for Gaussian quadrature using numpy legendre module
 def gaussxw(a, b, N):
     x, w = np.polynomial.legendre.leggauss(N)
     return 0.5*(b-a)*x + 0.5*(b+a), 0.5*(b-a)*w
 
-xsgauss, wsgauss = gaussxw(0, chistar, 40)
+Nquadrature = 15
+xsgauss, wsgauss = gaussxw(0, chistar, Nquadrature)
 
 @np.vectorize
 def integrate_bispectrum_kkk_TR_gauss(l1, l2, l3, angle12, angle13, angle23):
@@ -247,4 +249,61 @@ def integrate_bispectrum_kkk_TR_gauss_from_triangle(l1, l2, l3):
     return np.dot(bispectrum_at_ells_of_chi(xsgauss), wsgauss)
 
 
+
 chipow_4_times_Wkk3_pre_calc = xsgauss**(-4)*iqn.Wkk(xsgauss)**3
+
+
+@np.vectorize
+def integrate_bispectrum_kkk_TR_cos_scipy_from_triangle(l1, l2, l3):
+    @np.vectorize
+    def bispectrum_at_ells_of_chi(chi): 
+        cangle12, cangle13, cangle23 = get_angle_cos12(l1, l2, l3), get_angle_cos12(l1, l3, l2), get_angle_cos12(l2, l3, l1)
+        return chi**(-4)*iqn.Wkk(chi)**3*bispectrum_matter_cos_TR(l1/chi, l2/chi, l3/chi, cangle12, cangle13, cangle23, iqn.zofchi(chi))
+    return sinteg.quadrature(bispectrum_at_ells_of_chi, 0, chistar, miniter = 10, maxiter = 50, rtol = 1e-12)[0]
+
+@np.vectorize
+def integrate_bispectrum_kkk_TR_cos_gauss_from_triangle(l1, l2, l3):
+    @np.vectorize
+    def bispectrum_at_ells_of_chi(chi): 
+        cangle12, cangle13, cangle23 = get_angle_cos12(l1, l2, l3), get_angle_cos12(l1, l3, l2), get_angle_cos12(l2, l3, l1)
+        return bispectrum_matter_cos_TR(l1/chi, l2/chi, l3/chi, cangle12, cangle13, cangle23, iqn.zofchi(chi))
+    return np.dot(bispectrum_at_ells_of_chi(xsgauss)*chipow_4_times_Wkk3_pre_calc, wsgauss)
+
+
+#@vectorize([float64(float64, float64, float64)])
+@jit(nopython = True, fastmath = True)
+def bispecTR(l1, l2, l3):
+    cangle12, cangle13, cangle23 = get_angle_cos12(l1, l2, l3), get_angle_cos12(l1, l3, l2), get_angle_cos12(l2, l3, l1)
+    bispec_arr = np.empty(xsgauss.size)
+    #for i, x in enumerate(xsgauss):
+    for i in prange(xsgauss.size):
+        x = xsgauss[i]
+        bispec_arr[i] = bispectrum_matter_cos_TR(l1/x, l2/x, l3/x, cangle12, cangle13, cangle23, iqn.zofchi(x))
+    somma = np.dot(chipow_4_times_Wkk3_pre_calc*bispec_arr, wsgauss)
+    return somma
+
+@jit(nopython = True, fastmath = True)
+def bispecGM(l1, l2, l3):
+    cangle12, cangle13, cangle23 = get_angle_cos12(l1, l2, l3), get_angle_cos12(l1, l3, l2), get_angle_cos12(l2, l3, l1)
+    bispec_arr = np.empty(xsgauss.size)
+    #for i, x in enumerate(xsgauss):
+    for i in prange(xsgauss.size):
+        x = xsgauss[i]
+        bispec_arr[i] = bispectrum_matter_cos_GM(l1/x, l2/x, l3/x, cangle12, cangle13, cangle23, iqn.zofchi(x))
+    somma = np.dot(chipow_4_times_Wkk3_pre_calc*bispec_arr, wsgauss)
+    return somma
+
+
+
+@vectorize([float64(float64, float64, float64)])
+@jit(nopython = True, fastmath = True)
+def bispec_phi_TR(l1, l2, l3):
+    factor = 8/(l1**2*l2**2*l3**2)
+    return bispecTR(l1, l2, l3)*factor
+
+
+@vectorize([float64(float64, float64, float64)])
+@jit(nopython = True, fastmath = True)
+def bispec_phi_GM(l1, l2, l3):
+    factor = 8/(l1**2*l2**2*l3**2)
+    return bispecGM(l1, l2, l3)*factor

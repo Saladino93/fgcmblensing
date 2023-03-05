@@ -2,7 +2,7 @@ import numpy as np
 
 import pickle
 
-from joblib import Parallel, delayed
+import multiprocessing as mp
 
 from numba import jit
 
@@ -124,21 +124,36 @@ def loop(l1, lmax):
             #results += [(l1, l2, l3)] #=W3j_approx(l1, l2, l3)
     return somma
 
+if __name__ == "__main__":
 
-for lmax in lmaxes:
+    processes = []
 
     lmin = 2
 
-    ells = np.arange(lmin, lmax, 1)
+    for lmax in lmaxes:
+        ells = np.arange(lmin, lmax, 1)
+        for l1 in ells:
+            p = mp.Process(target = loop, args = (l1, lmax))
+            processes.append(p)
+            p.start()
 
-    start = time.time()
-    results = Parallel(n_jobs = n_jobs, batch_size = batch_size, backend = backend, verbose = 0)(delayed(loop)(l1, lmax) for l1 in ells)
-    #[loop(l1) for l1 in ells]
-    end = time.time()
-    print("Time (s)", end - start)
+        for process in processes:
+            process.join()
 
-    with open(f"{direc}/{caso}_allowed_configs_{lmax}", "wb") as fp: 
-        pickle.dump(results, fp)
+    for lmax in lmaxes:
 
-#with open("allowed_configs", "rb") as fp:
-#    results = pickle.load(fp)
+        lmin = 2
+
+        ells = np.arange(lmin, lmax, 1)
+
+        start = time.time()
+        results = Parallel(n_jobs = n_jobs, batch_size = batch_size, backend = backend, verbose = 0)(delayed(loop)(l1, lmax) for l1 in ells)
+        #[loop(l1) for l1 in ells]
+        end = time.time()
+        print("Time (s)", end - start)
+
+        with open(f"{direc}/{caso}_allowed_configs_{lmax}", "wb") as fp: 
+            pickle.dump(results, fp)
+
+    #with open("allowed_configs", "rb") as fp:
+    #    results = pickle.load(fp)
