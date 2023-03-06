@@ -147,16 +147,11 @@ class sims_cmb_len(object):
             os.makedirs(lib_dir)
         mpi.barrier()
         fields = _get_fields(cls_unl)
-
-        if lib_pha is None and mpi.rank == 0:
-            lib_pha = phas.lib_phas(os.path.join(lib_dir, 'phas'), len(fields), lmax + dlmax)
-        else:  # Check that the lib_alms are compatible :
-            if lib_pha is not None:
-                assert lib_pha.lmax == lmax + dlmax
-        mpi.barrier()
-
         if lib_pha is None:
             lib_pha = phas.lib_phas(os.path.join(lib_dir, 'phas'), len(fields), lmax + dlmax)
+        else:  # Check that the lib_alms are compatible :
+            assert lib_pha.lmax == lmax + dlmax
+        mpi.barrier()
 
         self.lmin_dlm = lmin_dlm
 
