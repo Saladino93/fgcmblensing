@@ -79,4 +79,4 @@ def eval_linear_numba(grid, values, points):
 
 @jit(nopython = True)
 def Q(x): 
-    return (4-2**x)/(1+2**(x+1))
+    return (4.-2.**x)/(1.+2**(x+1.))
