@@ -64,7 +64,7 @@ def bispecTR(l1, l2, l3):
     return somma
 
 
-@jit(nopython = True, fastmath = True, parallel=True)
+@jit(nopython = True, fastmath = True)
 def bispecGM(l1, l2, l3):
     cangle12, cangle13, cangle23 = b3n.get_angle_cos12(l1, l2, l3), b3n.get_angle_cos12(l1, l3, l2), b3n.get_angle_cos12(l2, l3, l1)
     result = b3n.chipow_4_times_Wkk3_pre_calc
@@ -76,7 +76,7 @@ def bispecGM(l1, l2, l3):
     somma = np.dot(result*bispec_arr, b3n.wsgauss)
     return somma
 
-@jit(nopython = True, fastmath = True, parallel=True)
+@jit(nopython = True, fastmath = True)
 def bispecSC(l1, l2, l3):
     cangle12, cangle13, cangle23 = b3n.get_angle_cos12(l1, l2, l3), b3n.get_angle_cos12(l1, l3, l2), b3n.get_angle_cos12(l2, l3, l1)
     result = b3n.chipow_4_times_Wkk3_pre_calc
