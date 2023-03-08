@@ -76,29 +76,46 @@ def bispecGM(l1, l2, l3):
     somma = np.dot(result*bispec_arr, b3n.wsgauss)
     return somma
 
-lmaxes = [10, 20, 30, 40, 50, 80, 100, 200, 300, 400, 600, 800, 1000, 1100, 2000, 2500, 3000]
+@jit(nopython = True, fastmath = True, parallel=True)
+def bispecSC(l1, l2, l3):
+    cangle12, cangle13, cangle23 = b3n.get_angle_cos12(l1, l2, l3), b3n.get_angle_cos12(l1, l3, l2), b3n.get_angle_cos12(l2, l3, l1)
+    result = b3n.chipow_4_times_Wkk3_pre_calc
+    bispec_arr = np.empty(b3n.xsgauss.size)
+    #for i, x in enumerate(b3n.xsgauss):
+    for i in prange(b3n.xsgauss.size):
+        x = b3n.xsgauss[i]
+        bispec_arr[i] = b3n.bispectrum_matter_cos_SC(l1/x, l2/x, l3/x, cangle12, cangle13, cangle23, iqn.zofchi(x))
+    somma = np.dot(result*bispec_arr, b3n.wsgauss)
+    return somma
+
+lmaxes =  [1000]#[10, 20, 30, 40, 50, 80, 100, 200, 300, 400, 600, 1000, 2000] #[10, 20, 30, 40, 50, 80, 100, 200, 300, 400, 600, 1000, 2000] #[10, 20, 30, 40, 50, 80, 100, 200, 300, 400, 600, 1000, 1100, 2000, 2500, 3000]
 #lmaxes = [600, 800, 1000, 1100, 2000, 2500, 3000]
 
 dirnew = "allowed_configs_results"
-dirthree = "allowed_configs_results_threej"
+#dirthree = "allowed_configs_results_threej"
 direc = dirnew
 
-GM, TR = "GM", "TR"
-caso = GM
+GM, TR, SC = "GM", "TR", "SC"
+models = [TR, SC, GM]
+caso = SC
+#index = models.index(caso)
+
 if caso == TR:
     bispec = bispecTR
 elif caso == GM:
     bispec = bispecGM
+elif caso == SC:
+    bispec = bispecSC
 
 batch_size = 'auto'
-n_jobs = 8
+n_jobs = 4
 backend = "loky"
 
-@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True, parallel = True)
 def loop(l1, lmin, lmax):
     somma = 0.
     #lmin = l1
-    for l2 in range(lmin, lmax):
+    for l2 in prange(lmin, lmax):
         """
         #numba float array 
         out = np.empty(3*lmax, dtype=np.float64)
@@ -108,7 +125,7 @@ def loop(l1, lmin, lmax):
         numbers = numbers[1:] if l3min in [0, 1] else numbers
         for i, l3 in enumerate(range(l3min, l3min+len(numbers))) :#range(l2, lmax):
         """
-        for l3 in range(l2, lmax):
+        for l3 in prange(l2, lmax):
             #check triangle conditions
             if (l3>l1+l2) or (l3<abs(l1-l2)):
                 continue
@@ -139,6 +156,7 @@ for lmax in lmaxes:
 
     start = time.time()
     results = Parallel(n_jobs = n_jobs, batch_size = batch_size, backend = backend, verbose = 0)(delayed(loop)(l1, lmin, lmax) for l1 in ells)
+    #print(results)
     #[loop(l1) for l1 in ells]
     end = time.time()
     print(f"Time (s) for {lmax} is", end - start)

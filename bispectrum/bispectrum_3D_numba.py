@@ -187,21 +187,21 @@ def cfuncSC(z, k):
 ##create meshgrid in z, k to interpolate over a, b, c function of GM model
 
 
-@jit(nopython = True, cache = True)
+@jit(nopython = True)#, cache = True)
 def F2ptker_vector_GM(k1, k2, theta12, z):
     resultG = 5/7*afuncGM(z, k1)*afuncGM(z, k2)
     resultS = 1/2*(k1/k2 + k2/k1)*np.cos(theta12)*bfuncGM(z, k1)*bfuncGM(z, k2)
     resultT = 2/7*(np.cos(theta12))**2*cfuncGM(z, k1)*cfuncGM(z, k2)
     return resultG + resultS + resultT
 
-@jit(nopython = True, cache = True)
+@jit(nopython = True)#, cache = True)
 def F2ptker_vector_cos_GM(k1, k2, costheta12, z):
     resultG = 5/7*afuncGM(z, k1)*afuncGM(z, k2)
     resultS = 1/2*(k1/k2 + k2/k1)*costheta12*bfuncGM(z, k1)*bfuncGM(z, k2)
     resultT = 2/7*(costheta12)**2*cfuncGM(z, k1)*cfuncGM(z, k2)
     return resultG + resultS + resultT
 
-@jit(nopython = True, cache = True)
+@jit(nopython = True)#, cache = True)
 def F2ptker_vector_cos_SC(k1, k2, costheta12, z):
     resultG = 5/7*afuncSC(z, k1)*afuncSC(z, k2)
     resultS = 1/2*(k1/k2 + k2/k1)*costheta12*bfuncSC(z, k1)*bfuncSC(z, k2)
@@ -209,14 +209,14 @@ def F2ptker_vector_cos_SC(k1, k2, costheta12, z):
     return resultG + resultS + resultT
 
 
-@jit(nopython = True, cache = True)
+@jit(nopython = True)#, cache = True)
 def F2ptker_vector_TR(k1, k2, theta12, z):
     resultG = 5/7
     resultS = 1/2*(k1/k2 + k2/k1)*np.cos(theta12)
     resultT = 2/7*(np.cos(theta12))**2
     return resultG + resultS + resultT
 
-@jit(nopython = True, cache = True)
+@jit(nopython = True)#, cache = True)
 def F2ptker_vector_cos_TR(k1, k2, costheta12, z):
     resultG = 5/7
     resultS = 1/2*(k1/k2 + k2/k1)*costheta12
@@ -295,6 +295,14 @@ def bispectrum_matter_cos_GM(k1, k2, k3, ctheta12, ctheta13, ctheta23, z):
     return somma*allowed(k1)*allowed(k2)*allowed(k3)
 
 
+@jit(nopython = True)
+def bispectrum_matter_cos_SC(k1, k2, k3, ctheta12, ctheta13, ctheta23, z):
+    somma = 2*F2ptker_vector_cos_SC(k1, k2, ctheta12, z)*iqn.P2D(z, k1)*iqn.P2D(z, k2)
+    somma += 2*F2ptker_vector_cos_SC(k1, k3, ctheta13, z)*iqn.P2D(z, k1)*iqn.P2D(z, k3)
+    somma += 2*F2ptker_vector_cos_SC(k2, k3, ctheta23, z)*iqn.P2D(z, k2)*iqn.P2D(z, k3)
+    return somma*allowed(k1)*allowed(k2)*allowed(k3)
+
+
 
 
 chistar = 13858.934986501856
@@ -361,7 +369,7 @@ def integrate_bispectrum_kkk_TR_cos_gauss_from_triangle(l1, l2, l3):
 
 
 #@vectorize([float64(float64, float64, float64)])
-@jit(nopython = True, fastmath = True, parallel = True)
+@jit(nopython = True, fastmath = True)
 def bispecTR(l1, l2, l3):
     cangle12, cangle13, cangle23 = get_angle_cos12(l1, l2, l3), get_angle_cos12(l1, l3, l2), get_angle_cos12(l2, l3, l1)
     bispec_arr = np.empty(xsgauss.size)
@@ -373,7 +381,7 @@ def bispecTR(l1, l2, l3):
     return somma
 
 
-@jit(nopython = True, fastmath = True, parallel = True)
+@jit(nopython = True, fastmath = True)
 def bispec_general(l1, l2, l3, model):
     cangle12, cangle13, cangle23 = get_angle_cos12(l1, l2, l3), get_angle_cos12(l1, l3, l2), get_angle_cos12(l2, l3, l1)
     bispec_arr = np.empty(xsgauss.size)
@@ -385,7 +393,7 @@ def bispec_general(l1, l2, l3, model):
     return somma
 
 
-@jit(nopython = True, fastmath = True, parallel = True)
+@jit(nopython = True, fastmath = True)
 def bispecTRfork(l1, l2, l3, kmin, kmax):
     cangle12, cangle13, cangle23 = get_angle_cos12(l1, l2, l3), get_angle_cos12(l1, l3, l2), get_angle_cos12(l2, l3, l1)
     bispec_arr = np.empty(xsgauss.size)
@@ -396,7 +404,7 @@ def bispecTRfork(l1, l2, l3, kmin, kmax):
     somma = np.dot(chipow_4_times_Wkk3_pre_calc*bispec_arr, wsgauss)
     return somma
 
-@jit(nopython = True, fastmath = True, parallel = True)
+@jit(nopython = True, fastmath = True)
 def bispecGM(l1, l2, l3):
     cangle12, cangle13, cangle23 = get_angle_cos12(l1, l2, l3), get_angle_cos12(l1, l3, l2), get_angle_cos12(l2, l3, l1)
     bispec_arr = np.empty(xsgauss.size)
@@ -429,14 +437,14 @@ def bispec_phi_TR(l1, l2, l3):
 
 
 @vectorize([float64(float64, float64, float64)])
-@jit(nopython = True, fastmath = True, parallel = True)
+@jit(nopython = True, fastmath = True)
 def bispec_phi_GM(l1, l2, l3):
     factor = 8/(l1**2*l2**2*l3**2)
     return bispecGM(l1, l2, l3)*factor
 
 
 @vectorize([float64(float64, float64, float64, int64)])
-@jit(nopython = True, fastmath = True, parallel = True)
+@jit(nopython = True, fastmath = True)
 def bispec_phi_general(l1, l2, l3, modelint):
     factor = 8/(l1**2*l2**2*l3**2)
     if modelint == 0:
