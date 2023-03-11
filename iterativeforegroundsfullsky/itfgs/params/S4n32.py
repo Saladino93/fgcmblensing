@@ -86,7 +86,7 @@ casolog = "log"
 casorandlogdoubleskew = "randlogdoubleskew"
 casologdoubleskew = "logdoubleskew"
 
-cases = [casostd, casorand, casogauss, casorandlog, casolog]
+cases = [casostd, casorand, casogauss, casorandlog, casolog, casorandlogdoubleskew, casologdoubleskew]
 
 caso = casorand
 
