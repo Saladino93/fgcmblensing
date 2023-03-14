@@ -38,9 +38,6 @@ def P2D(z, k):
 
 
 
-
-
-
 name = names[1]
 valuesPlin = np.loadtxt(f"numbaproducts/{name}_matter_power.txt")
 def Plin2D(z, k):

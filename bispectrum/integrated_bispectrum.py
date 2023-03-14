@@ -7,7 +7,7 @@ from angularcls import windows, cosmoconstants
 
 import pathlib
 
-outpath = pathlib.Path("products")
+outpath = pathlib.Path("numbaproducts")
 
 nz = 6000 #number of steps to use for the radial/redshift integration
 kmax = 100  #kmax to use
@@ -34,12 +34,12 @@ omch2 = 0.1212
 ommh2 = ombh2+omch2
 h = H0/100
 Omegam = ommh2/h**2
-pars.set_cosmology(H0=H0, ombh2=ombh2, omch2=omch2, mnu=0)
-pars.InitPower.set_params(As=2.1265e-09, ns=0.96)
+pars.set_cosmology(H0 = H0, ombh2 = ombh2, omch2 = omch2, mnu = 0, num_massive_neutrinos = 0)
+pars.InitPower.set_params(As = 2.1265e-09, ns = 0.96)
 
 # reionization and recombination 
 pars.Reion.use_optical_depth = True
-pars.Reion.optical_depth = 0.0925
+pars.Reion.optical_depth = 0.0925 #tau
 pars.Reion.delta_redshift = 0.5
 pars.Recomb.RECFAST_fudge = 1.14
 
@@ -59,11 +59,11 @@ Hzs = results.hubble_parameter(zs)
 
 PK = camb.get_matter_power_interpolator(pars, nonlinear = True, 
     hubble_units = False, k_hunit = False, kmax = kmax, k_per_logint = None,
-    var1 = 'delta_nonu', var2 = 'delta_nonu', zmax = zs[-1])
+    var1 = cmodel.Transfer_nonu, var2 = cmodel.Transfer_nonu, zmax = zs[-1])
 
 PKlin = camb.get_matter_power_interpolator(pars, nonlinear = False, 
     hubble_units = False, k_hunit = False, kmax = kmax, k_per_logint = None,
-    var1 = 'delta_nonu', var2 = 'delta_nonu', zmax = zs[-1])
+    var1 = cmodel.Transfer_nonu, var2 = cmodel.Transfer_nonu, zmax = zs[-1])
 
 ksaving = np.logspace(-5, 2, 1000)
 zsaving = np.append(0, np.logspace(-5, 3, 1000))
@@ -85,7 +85,7 @@ np.savetxt(outpath/'sigma8.txt', np.c_[zm, s8])
 
 Q = lambda x: (4-2**x)/(1+2**(x+1))
  
-nonlinearscale = lambda z, k: 4*np.pi*k**3*PKlin.P(z, k)-1
+nonlinearscale = lambda z, k: PKlin.P(z, k)*k**3/(2*np.pi**2.)-1 #4*np.pi*k**3*PKlin.P(z, k)-1
 
 #find root of nonlinearscale(k) = 0 with scipy
 from scipy import optimize
@@ -109,7 +109,7 @@ d2_dx1 = findiff.FinDiff(0, dkgrid, 1)
 neff2D = []
 
 ksneff = np.exp(kgrid) #np.logspace(-3, 2, 500)
-kneff_min, kneff_max = 0.001, 0.8
+kneff_min, kneff_max = 0.001, 1
 weights = np.ones_like(ksneff)
 weights[ksneff < kneff_min] = 100
 weights[ksneff > kneff_max] = 100
@@ -129,9 +129,17 @@ np.savetxt(outpath/'neff_z.txt', zgrid)
 np.savetxt(outpath/'neff_k.txt', ksneff)
 np.savetxt(outpath/'neff.txt', neff2D)
 
+#from Antony Lewis' code, 
+#https://github.com/cmbant/notebooks/blob/master/PostBorn.ipynb
+
+nk = PKlin(0.1, np.log(ksneff), grid = False, dy = 1)
+w=np.ones(nk.size)
+w[ksneff < 5e-3]=100
+w[ksneff > 1]=10
+nksp =  interp.UnivariateSpline(np.log(ksneff), nk, s = 30, w = w)
 
 nefff_ = interp.RectBivariateSpline(zgrid, np.exp(kgrid), neff2D)
-nefff = lambda z, k: nefff_(z, k, grid = False)
+nefff = lambda z, k: nksp(np.log(k)) #nefff_(z, k, grid = False)
 #interp.interp1d(np.exp(kgrid), neff, kind = 'cubic', fill_value = 'extrapolate')
 
 #zm, s8 = np.loadtxt('sigma8.txt', unpack = True)
