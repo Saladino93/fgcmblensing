@@ -145,6 +145,7 @@ nefff = lambda z, k: nksp(np.log(k)) #nefff_(z, k, grid = False)
 #zm, s8 = np.loadtxt('sigma8.txt', unpack = True)
 s8 = interp.interp1d(zm, s8, kind = 'cubic', fill_value = 'extrapolate')
 
+
 def getSCcoeffs():
     a1 = 0.250
     a2 = 3.50 
@@ -176,19 +177,35 @@ def get_coeffs(model):
     elif model == 'SC':
         return getSCcoeffs()
 
+zmax_bispec = 6.
 
 def get_afuncs_form_coeffs_for_interp(model):
     a1, a2, a3, a4, a5, a6, a7, a8, a9 = get_coeffs(model)
-    afuncGM = lambda z, k: (1+s8(z)**a6*np.sqrt(0.7*Q(nefff(z, k)))*(k/kNLzf(z)*a1)**(nefff(z, k)+a2))/(1+(a1*k/kNLzf(z))**(nefff(z, k)+a2))
-    bfuncGM = lambda z, k: (1+0.2*a3*(nefff(z, k)+3)*(k/kNLzf(z)*a7)**(nefff(z, k)+3+a8))/(1+(a7*k/kNLzf(z))**(nefff(z, k)+3.5+a8))
-    cfuncGM = lambda z, k: (1+(4.5*a4/(1.5+(nefff(z, k)+3)**4)))*(k/kNLzf(z)*a5)**(nefff(z, k)+3+a9)/(1+(a5*k/kNLzf(z))**(nefff(z, k)+3.5+a9))
+    @np.vectorize
+    def afuncGM(z, k, grid):
+        if z >= zmax_bispec: 
+            return 1
+        return (1+s8(z)**a6*np.sqrt(0.7*Q(nefff(z, k)))*(k/kNLzf(z)*a1)**(nefff(z, k)+a2))/(1+(a1*k/kNLzf(z))**(nefff(z, k)+a2))
+    
+    @np.vectorize
+    def bfuncGM(z, k, grid): 
+        if z >= zmax_bispec: 
+            return 1
+        return (1+0.2*a3*(nefff(z, k)+3)*(k/kNLzf(z)*a7)**(nefff(z, k)+3+a8))/(1+(a7*k/kNLzf(z))**(nefff(z, k)+3.5+a8))
+
+    @np.vectorize
+    def cfuncGM(z, k, grid):
+        if z >= zmax_bispec:
+            return 1
+        return (1+(4.5*a4/(1.5+(nefff(z, k)+3)**4))*(k/kNLzf(z)*a5)**(nefff(z, k)+3+a9))/(1+(a5*k/kNLzf(z))**(nefff(z, k)+3.5+a9))
+
     return [afuncGM, bfuncGM, cfuncGM]
 
 ks = np.logspace(-5, 2, 300)
 zmmesh, ksmesh = np.meshgrid(zm, ks, indexing = 'ij')
 fit_funcs = {}
 for model in ['GM', 'SC']:
-    fit_funcs[model] = [interp.RectBivariateSpline(zm, ks, fun(zmmesh, ksmesh)) for fun in get_afuncs_form_coeffs_for_interp(model)]
+    fit_funcs[model] = get_afuncs_form_coeffs_for_interp(model)#[interp.RectBivariateSpline(zm, ks, fun(zmmesh, ksmesh)) for fun in get_afuncs_form_coeffs_for_interp(model)]
 
 #fit_funcs_alt = {}
 #for model in ['GM', 'SC']:
@@ -213,7 +230,7 @@ def getfuncs(model):
     elif model in ['GM', 'SC']:
         return get_afuncs_form_coeffs(model)
 
-def F2ptker_vector(k1, k2, theta12, z, model = 'TR'):
+def F2ptker_vector(k1, k2, costheta12, z, model = 'TR'):
     """
     Calculates F2 kernel from PT.
 
@@ -228,10 +245,13 @@ def F2ptker_vector(k1, k2, theta12, z, model = 'TR'):
     """
     afunc, bfunc, cfunc = getfuncs(model)
     resultG = 5/7*afunc(z, k1, grid = False)*afunc(z, k2, grid = False)
-    resultS = bfunc(z, k1, grid = False)*bfunc(z, k2, grid = False)*1/2*(k1/k2 + k2/k1)*np.cos(theta12)
-    resultT = 2/7*(np.cos(theta12))**2*cfunc(z, k1, grid = False)*cfunc(z, k2, grid = False)
+    resultS = bfunc(z, k1, grid = False)*bfunc(z, k2, grid = False)*1/2*(k1/k2 + k2/k1)*costheta12
+    resultT = 2/7*(costheta12)**2*cfunc(z, k1, grid = False)*cfunc(z, k2, grid = False)
     return resultG + resultS + resultT
 
+
+def get_cos(k1, k2, k3):
+    return -(k1**2+k2**2-k3**2)/(2*k1*k2)
 
 P = PK.P #memoize?
 #avoid recomputing the same things
@@ -239,8 +259,9 @@ P = PK.P #memoize?
 def bispectrum_matter(k1, k2, k3, theta12, theta13, theta23, z, model = 'TR'):
     ksvec = [k1, k2, k3]
     combinations = list(itertools.combinations([0,1,2], 2))
-    thetas = [theta12, theta13, theta23] #assume this is the order too from combinations
-    return sum([2*F2ptker_vector(ksvec[comb[0]], ksvec[comb[1]], thetaij, z, model = model)*P(z, ksvec[comb[0]], grid = False)*P(z, ksvec[comb[1]], grid = False) for comb, thetaij in zip(combinations, thetas)])
+    #costhetas = [theta12, theta13, theta23] #assume this is the order too from combinations
+    costhetas = [get_cos(k1, k2, k3), get_cos(k1, k3, k2), get_cos(k2, k3, k1)]
+    return sum([2*F2ptker_vector(ksvec[comb[0]], ksvec[comb[1]], costhetaij, z, model = model)*P(z, ksvec[comb[0]], grid = False)*P(z, ksvec[comb[1]], grid = False) for comb, costhetaij in zip(combinations, costhetas)])
 
 #vectorized for P?
 def bispectrum_matter_2(k1, k2, k3, theta12, theta13, theta23, z, model = 'TR'):

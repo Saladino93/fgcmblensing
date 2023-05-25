@@ -133,9 +133,12 @@ def getSCcoeffs():
     return a1, a2, a3, a4, a5, a6, a7, a8, a9
 
 
+zmax_bispec = 6.
 
 @jit(nopython = True)
 def afunc(z, k, a1, a2, a6): 
+    if z >= zmax_bispec:
+        return 1.
     ncalc = iqn.nefff(z, k)
     kNLcalc = iqn.kNLzf(z)
     return (1+iqn.s8(z)**a6*np.sqrt(0.7*iqn.Q(ncalc))*(k/kNLcalc*a1)**(ncalc+a2))/(1+(a1*k/kNLcalc)**(ncalc+a2))
@@ -152,6 +155,8 @@ def afuncSC(z, k):
 
 @jit(nopython = True)
 def bfunc(z, k, a3, a7, a8): 
+    if z >= zmax_bispec:
+        return 1.
     ncalc = iqn.nefff(z, k)
     kNLcalc = iqn.kNLzf(z)
     return (1+0.2*a3*(ncalc+3)*(k/kNLcalc*a7)**(ncalc+3+a8))/(1+(a7*k/kNLcalc)**(ncalc+3.5+a8))
@@ -170,9 +175,11 @@ def bfuncSC(z, k):
 
 @jit(nopython = True)
 def cfunc(z, k, a4, a5, a9):
+    if z >= zmax_bispec:
+        return 1.
     ncalc = iqn.nefff(z, k)
     kNLcalc = iqn.kNLzf(z)
-    return (1+(4.5*a4/(1.5+(ncalc+3)**4)))*(k/kNLcalc*a5)**(ncalc+3+a9)/(1+(a5*k/kNLcalc)**(ncalc+3.5+a9))
+    return (1+(4.5*a4/(1.5+(ncalc+3)**4))*(k/kNLcalc*a5)**(ncalc+3+a9))/(1+(a5*k/kNLcalc)**(ncalc+3.5+a9))
 
 @jit(nopython = True)
 def cfuncGM(z, k):
@@ -228,7 +235,7 @@ combinations = list(itertools.combinations([0,1,2], 2))
 
 @jit(nopython = True)
 def allowed(k):
-    return (k >= 1e-12) & (k <= 50)
+    return (k >= 1e-12) & (k <= 100)
 
 @jit(nopython = True)
 def bispectrum_matter_TR(k1, k2, k3, theta12, theta13, theta23, z):
@@ -331,12 +338,12 @@ def integrate_bispectrum_kkk_TR_gauss(l1, l2, l3, angle12, angle13, angle23):
 
 @jit(nopython = True, fastmath = True)
 def get_angle_12(L1, L2, L3):
-    term = (L1**2+L2**2-L3**2)/(2*L1*L2)
+    term = -(L1**2+L2**2-L3**2)/(2*L1*L2)
     return np.arccos(term)
 
 @jit(nopython = True, fastmath = True)
 def get_angle_cos12(L1, L2, L3):
-    return (L1**2+L2**2-L3**2)/(2*L1*L2)
+    return -(L1**2+L2**2-L3**2)/(2*L1*L2)
 
 def integrate_bispectrum_kkk_TR_gauss_from_triangle(l1, l2, l3):
     @np.vectorize
@@ -376,7 +383,7 @@ def bispecTR(l1, l2, l3):
     #for i, x in enumerate(xsgauss):
     for i in prange(xsgauss.size):
         x = xsgauss[i]
-        bispec_arr[i] = bispectrum_matter_cos_TR(l1/x, l2/x, l3/x, cangle12, cangle13, cangle23, iqn.zofchi(x))
+        bispec_arr[i] = bispectrum_matter_cos_TR((l1+0.5)/x, (l2+0.5)/x, (l3+0.5)/x, cangle12, cangle13, cangle23, iqn.zofchi(x))
     somma = np.dot(chipow_4_times_Wkk3_pre_calc*bispec_arr, wsgauss)
     return somma
 
@@ -384,11 +391,12 @@ def bispecTR(l1, l2, l3):
 @jit(nopython = True, fastmath = True)
 def bispec_general(l1, l2, l3, model):
     cangle12, cangle13, cangle23 = get_angle_cos12(l1, l2, l3), get_angle_cos12(l1, l3, l2), get_angle_cos12(l2, l3, l1)
+    l1, l2, l3 = abs(l1), abs(l2), abs(l3)
     bispec_arr = np.empty(xsgauss.size)
     #for i, x in enumerate(xsgauss):
     for i in prange(xsgauss.size):
         x = xsgauss[i]
-        bispec_arr[i] = bispectrum_matter_cos_general(l1/x, l2/x, l3/x, cangle12, cangle13, cangle23, iqn.zofchi(x), model)
+        bispec_arr[i] = bispectrum_matter_cos_general((l1+0.5)/x, (l2+0.5)/x, (l3+0.5)/x, cangle12, cangle13, cangle23, iqn.zofchi(x), model)
     somma = np.dot(chipow_4_times_Wkk3_pre_calc*bispec_arr, wsgauss)
     return somma
 
@@ -400,7 +408,7 @@ def bispecTRfork(l1, l2, l3, kmin, kmax):
     #for i, x in enumerate(xsgauss):
     for i in prange(xsgauss.size):
         x = xsgauss[i]
-        bispec_arr[i] = bispectrum_matter_cos_TR_for_k(l1/x, l2/x, l3/x, cangle12, cangle13, cangle23, iqn.zofchi(x), kmin, kmax)
+        bispec_arr[i] = bispectrum_matter_cos_TR_for_k((l1+0.5)/x, (l2+0.5)/x, (l3+0.5)/x, cangle12, cangle13, cangle23, iqn.zofchi(x), kmin, kmax)
     somma = np.dot(chipow_4_times_Wkk3_pre_calc*bispec_arr, wsgauss)
     return somma
 
@@ -411,7 +419,7 @@ def bispecGM(l1, l2, l3):
     #for i, x in enumerate(xsgauss):
     for i in prange(xsgauss.size):
         x = xsgauss[i]
-        bispec_arr[i] = bispectrum_matter_cos_GM(l1/x, l2/x, l3/x, cangle12, cangle13, cangle23, iqn.zofchi(x))
+        bispec_arr[i] = bispectrum_matter_cos_GM((l1+0.5)/x, (l2+0.5)/x, (l3+0.5)/x, cangle12, cangle13, cangle23, iqn.zofchi(x))
     somma = np.dot(chipow_4_times_Wkk3_pre_calc*bispec_arr, wsgauss)
     return somma
 
@@ -480,5 +488,5 @@ def bispec_check_quadrature(l1, l2, l3, Nquadrature):
     #for i, x in enumerate(xsgauss):
     for i in prange(xsgauss.size):
         x = xsgauss[i]
-        bispec_arr[i] = bispectrum_matter_cos_TR(l1/x, l2/x, l3/x, cangle12, cangle13, cangle23, iqn.zofchi(x))
+        bispec_arr[i] = bispectrum_matter_cos_TR((l1+0.5)/x, (l2+0.5)/x, (l3+0.5)/x, cangle12, cangle13, cangle23, iqn.zofchi(x))
     return np.dot(chipow_4_times_Wkk3_pre_calc*bispec_arr, wsgauss)*8/(l1**2*l2**2*l3**2)
