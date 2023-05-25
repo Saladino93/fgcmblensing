@@ -17,11 +17,11 @@ import numpy as np
 
 outputdir = pathlib.Path('results')
 
-nmin, nmax = 0, 64
+nmin, nmax = 0, 1 #64
 
 lmax = SO.lmax_qlm #for analysis
 
-iters = [0, 1, 2, 3, 4, 5]
+iters = [0, 1] #, 2, 3, 4, 5]
 
 v = 'tol7'
 

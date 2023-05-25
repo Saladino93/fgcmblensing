@@ -35,7 +35,7 @@ import itfgs
 from itfgs.sims.sims_postborn import sims_postborn
 import itfgs.sims.sims_cmbs as simsit
 
-from plancklens.helpers import mpi
+#from plancklens.helpers import mpi
 
 
 def camb_clfile_gradient(fname, lmax=None):
@@ -72,11 +72,9 @@ class SehgalSim(sims_postborn):
 include_fgs_power = False
 
 baseSehgal = opj(os.environ['SCRATCH'], 'SKYSIMS/GIULIOSIMS/')
-baseWebsky = opj(os.environ['SCRATCH'], 'SKYSIMS/WEBSKYSIMS/')
 #baseSehgal = opj(os.environ['SCRATCH'], 'SehgalSims')
 
 suffix = 'S4Giulio' # descriptor to distinguish this parfile from others...
-suffixWebsky = 'S4Websky'
 
 casostd = ""
 casorand = "rand"
@@ -91,11 +89,7 @@ casologdoubleskew = "logdoubleskew"
 casopostborn = "postborn"
 casopostbornrand = "postbornrand"
 
-casowebskyborn = "websky"
-casowebskybornrand = "webskyrand"
-casowebskyborngauss = "webskygauss"
-
-cases = [casostd, casorand, casogauss, casorandlog, casolog, casorandlogdoubleskew, casologdoubleskew, casopostborn, casopostbornrand, casowebskyborn, casowebskybornrand, casowebskyborngauss]
+cases = [casostd, casorand, casogauss, casorandlog, casolog, casorandlogdoubleskew, casologdoubleskew, casopostborn, casopostbornrand]
 
 
 def get_info(caso: str) -> tuple:
@@ -184,33 +178,6 @@ def get_info(caso: str) -> tuple:
         names = ['']
         SimsShegalDict[0] = [lambda idx: opj(baseSehgal, nome) for nome in names]
 
-    elif caso == casowebskyborn:
-
-        suffixCMB = suffixWebsky+'WebskyBorn'
-        suffixCMBPhas = suffixWebsky
-        suffixLensing = suffixWebsky+'WebskyBorn'
-
-        SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, 'kap.fits')
-
-    elif caso == casowebskybornrand:
-
-        suffixCMB = suffixWebsky+'WebskyBornRand'
-        suffixCMBPhas = suffixWebsky
-        suffixLensing = suffixWebsky+'WebskyBornRand'
-
-        SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, 'kap_randomized.fits')
-
-    elif caso == casowebskyborngauss:
-
-        suffixCMB = suffixWebsky+'WebskyBornGauss'
-        suffixCMBPhas = suffixWebsky
-        suffixLensing = suffixWebsky+'WebskyBornGauss'
-
-        SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, f'websky_kappa_gauss_{idx}.fits')
-
 
     else:
         raise ValueError('caso not recognized')
@@ -234,19 +201,12 @@ def get_all(case: str):
 
     fgs = 0.
 
-    if "websky" in case:
-        print("Cosmology for", case)
-        cls_path = opj(os.environ['HOME'], 'fgcmblensing', 'input', 'websky')
-        cls_unl = utils.camb_clfile(opj(cls_path, 'lensedCMB_dmn1_lenspotentialCls_websky.dat'))
-        cls_len = utils.camb_clfile(opj(cls_path, 'lensedCMB_dmn1_lensedCls_websky.dat'))
-        cls_grad = camb_clfile_gradient(opj(cls_path, 'new_lensedCMB_dmn1_lensedgradCls_websky.dat'))
-    else:
-        cls_path = opj(os.environ['HOME'], 'fgcmblensing', 'input', 'giulio')
-        cls_unl = utils.camb_clfile(opj(cls_path, 'lensedCMB_dmn1_lenspotentialCls.dat'))
-        cls_len = utils.camb_clfile(opj(cls_path, 'lensedCMB_dmn1_lensedCls.dat'))
-        cls_grad = camb_clfile_gradient(opj(cls_path, 'lensedCMB_dmn1_lensedgradCls.dat'))
-
-
+    # Fiducial CMB spectra for QE and iterative reconstructions
+    # (here we use slightly suboptimal lensed spectra QE weights)
+    cls_path = opj(os.environ['HOME'], 'fgcmblensing', 'input', 'giulio')
+    cls_unl = utils.camb_clfile(opj(cls_path, 'lensedCMB_dmn1_lenspotentialCls.dat'))
+    cls_len = utils.camb_clfile(opj(cls_path, 'lensedCMB_dmn1_lensedCls.dat'))
+    cls_grad = camb_clfile_gradient(opj(cls_path, 'lensedCMB_dmn1_lensedgradCls.dat'))
 
     ll = [cls_unl, cls_len, cls_grad]
     for l in ll:
@@ -270,7 +230,7 @@ def get_all(case: str):
                      "lmax_phi": lmax_phi, "mmax_phi": mmax_phi, "lmax_qlm": lmax_qlm, "mmax_qlm": mmax_qlm}
 
     #----------------- pixelization and geometry info for the input maps and the MAP pipeline and for lensing operations
-    nside = 2048 if "websky" in case else 4096#CHECK
+    nside = 4096 #CHECK
     zbounds     = (-1.,1.) # colatitude sky cuts for noise variance maps (We could exclude all rings which are completely masked)
     ninvjob_geometry = utils_scarf.Geom.get_healpix_geometry(nside, zbounds=zbounds)
 
