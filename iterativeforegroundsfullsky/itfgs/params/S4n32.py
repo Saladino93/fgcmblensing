@@ -102,6 +102,8 @@ cases = [casostd, casorand, casogauss, casorandlog, casolog, casorandlogdoublesk
 
 def get_info(caso: str) -> tuple:
 
+    extra_tlm = None
+
     if caso == casorand:
 
         suffixCMB = suffix+'BornRand'
@@ -240,11 +242,13 @@ def get_info(caso: str) -> tuple:
 
     else:
         raise ValueError('caso not recognized')
+
     
     return suffixCMB, suffixCMBPhas, suffixLensing, SimsShegalDict, extra_tlm
 
 
 def get_all(case: str):
+   
     suffixCMB, suffixCMBPhas, suffixLensing, SimsShegalDict, extra_tlm = get_info(case)
 
     print("Working on case", case, "with suffix", suffixCMB, suffixCMBPhas, suffixLensing)
@@ -432,6 +436,9 @@ def get_all(case: str):
 
         #NOTE: UNLENSED RESPONSE HERE
         R_unl = qresp.get_response(k, lmax_ivf, 'p', cls_unl, cls_unl,  {'e': fel_unl, 'b': fbl_unl, 't':ftl_unl}, lmax_qlm=lmax_qlm)[0]
+        #R = qresp.get_response(k, lmax_ivf, 'p', cls_weight = cls_len, cls_cmb = cls_grad, fal = {'e': fel, 'b': fbl, 't':ftl}, lmax_qlm=lmax_qlm)[0]
+        #np.savetxt("R_unl.txt", R_unl)
+        #np.savetxt("R.txt", R)
         
         if k in ['p_p', 'ptt', 'p'] and 'wmfresp' in version:
             mf_resp = qresp.get_mf_resp(k, cls_unl, {'ee': fel_unl, 'bb': fbl_unl}, lmax_ivf, lmax_qlm)[0]
@@ -463,6 +470,13 @@ def get_all(case: str):
         k_geom = filtr.ffi.geom # Customizable Geometry for position-space operations in calculations of the iterated QEs etc
         # Sets to zero all L-modes below Lmin in the iterations:
         #NOTE: IS USING THE R_UNL RESPONSE TO OBTAIN ~ (1/Cpp + 1/N0)^-1 OK as first response?
+
+        specialee = True
+
+        if specialee:
+            print("Loading Special!!")
+            plm0 = np.load(f"/Users/omard/Downloads/SCRATCHFOLDER/n32/S4WebskyWebskyBorn/lenscarfrecs/pee_sim{simidx:04}/phi_plm_it000.npy")
+
         iterator = scarf_iterator.iterator_pertmf(libdir_iterator, 'p', (lmax_qlm, mmax_qlm), datmaps,
                 plm0, mf_resp, R_unl, cpp, cls_unl, filtr, k_geom, chain_descrs(lmax_unl, cg_tol), stepper
                 ,mf0=mf0)
