@@ -6,6 +6,7 @@ from plancklens.helpers import mpi
 from plancklens.sims import cmbs, phas, maps
 from plancklens import utils
 import pickle as pk
+from lenspyx.remapping import deflection
 
 verbose = False
 
@@ -142,7 +143,7 @@ class sims_cmb_len(object):
             verbose(defaults to True): lenspyx timing info printout
     """
     def __init__(self, lib_dir, lmax, cls_unl, lib_pha=None, offsets_plm=None, offsets_cmbunl=None,
-                 dlmax=1024, nside_lens=4096, facres=0, nbands=8, verbose=True, lmin_dlm = 2):
+                 dlmax=1024, nside_lens=4096, facres=0, nbands=8, verbose=True, lmin_dlm = 2, extra_tlm = None, epsilon = 1e-7):
         if not os.path.exists(lib_dir) and mpi.rank == 0:
             os.makedirs(lib_dir)
         mpi.barrier()
@@ -169,6 +170,8 @@ class sims_cmb_len(object):
         self.offset_plm = offsets_plm if offsets_plm is not None else (1, 0)
         self.offset_cmb = offsets_cmbunl if offsets_cmbunl is not None else (1, 0)
 
+        self.epsilon = epsilon
+
         fn_hash = os.path.join(lib_dir, 'sim_hash.pk')
         if mpi.rank == 0 and not os.path.exists(fn_hash) :
             pk.dump(self.hashdict(), open(fn_hash, 'wb'), protocol=2)
@@ -181,6 +184,9 @@ class sims_cmb_len(object):
             lenspyx = None
         self.lens_module = lenspyx
         self.verbose=verbose
+
+        #function to get some extra tlm
+        self.extra_tlm = extra_tlm
 
     @staticmethod
     def offset_index(idx, block_size, offset):
@@ -274,13 +280,26 @@ class sims_cmb_len(object):
             p2d[:self.lmin_dlm] = 0
 
             hp.almxfl(dlm, p2d, inplace=True)
-            Tlen = self.lens_module.alm2lenmap(tlm, [dlm, None], self.nside_lens,
-                                               facres=self.facres, nband=self.nbands, verbose=self.verbose)
+
+            Tlen = self.lens_module.alm2lenmap(tlm, [dlm, None], geometry = ('healpix', {'nside': self.nside_lens}), epsilon = self.epsilon, verbose = 0, pol = False)
+
             hp.write_alm(fname, hp.map2alm(Tlen, lmax=self.lmax, iter=0))
 
             hp.write_alm(pfname, plm)
 
-        return hp.read_alm(fname)
+
+        if (self.extra_tlm is not None):
+            extrafname = os.path.join(self.lib_dir, f'sim_{idx:04}_{self.extra_tlm.get_name()}lm.fits')
+            if (not os.path.exists(extrafname)):
+                extra_tlm = hp.map2alm(self.extra_tlm(idx), lmax=self.lmax, iter=0)
+                hp.write_alm(extrafname, extra_tlm)
+
+        total = hp.read_alm(fname)
+
+        if self.extra_tlm is not None:
+            total += hp.read_alm(extrafname)
+
+        return total
 
     def get_sim_elm(self, idx):
         fname = os.path.join(self.lib_dir, 'sim_%04d_elm.fits' % idx)

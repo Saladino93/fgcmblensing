@@ -95,6 +95,8 @@ casowebskyborn = "websky"
 casowebskybornrand = "webskyrand"
 casowebskyborngauss = "webskygauss"
 
+casowebskybornfgs = "webskyfgs"
+
 cases = [casostd, casorand, casogauss, casorandlog, casolog, casorandlogdoubleskew, casologdoubleskew, casopostborn, casopostbornrand, casowebskyborn, casowebskybornrand, casowebskyborngauss]
 
 
@@ -193,6 +195,30 @@ def get_info(caso: str) -> tuple:
         SimsShegalDict = {}
         SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, 'kap.fits')
 
+
+    elif caso == casowebskybornfgs:
+
+        suffixCMB = suffixWebsky+'WebskyBorn'
+        suffixCMBPhas = suffixWebsky
+        suffixLensing = suffixWebsky+'WebskyBornForegrounds'
+
+        SimsShegalDict = {}
+        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, 'kap.fits')
+
+        fgnames = ["ksz", "tsz_2048", "cib_nu0143"]
+        fgnames = ["ksz", "cib_nu0143"]
+
+        class Extra(object):
+
+            def __init__(self, name, fgnames):
+                self.name = name
+                self.fgnames = fgnames
+
+            def __call__(self, idx):
+                return np.sum([hp.read_map(opj(baseWebsky, f'{fgname}.fits')) for fgname in self.fgnames], axis = 0)
+                
+        extra_tlm = Extra('fgs', fgnames)
+
     elif caso == casowebskybornrand:
 
         suffixCMB = suffixWebsky+'WebskyBornRand'
@@ -215,11 +241,11 @@ def get_info(caso: str) -> tuple:
     else:
         raise ValueError('caso not recognized')
     
-    return suffixCMB, suffixCMBPhas, suffixLensing, SimsShegalDict
+    return suffixCMB, suffixCMBPhas, suffixLensing, SimsShegalDict, extra_tlm
 
 
 def get_all(case: str):
-    suffixCMB, suffixCMBPhas, suffixLensing, SimsShegalDict = get_info(case)
+    suffixCMB, suffixCMBPhas, suffixLensing, SimsShegalDict, extra_tlm = get_info(case)
 
     print("Working on case", case, "with suffix", suffixCMB, suffixCMBPhas, suffixLensing)
 
@@ -276,7 +302,7 @@ def get_all(case: str):
 
     zbounds_len = (-1.,1.) # Outside of these bounds the reconstructed maps are assumed to be zero
     pb_ctr, pb_extent = (0., 2 * np.pi) # Longitude cuts, if any, in the form (center of patch, patch extent)
-    lenjob_geometry = utils_geom.Geom.get_thingauss_geometry(lmax_unl, 2, zbounds=zbounds_len)
+    lenjob_geometry = utils_geom.Geom.get_thingauss_geometry(lmax_unl, 2) #, zbounds=zbounds_len)
     lenjob_pbgeometry =utils_scarf.pbdGeometry(lenjob_geometry, utils_scarf.pbounds(pb_ctr, pb_extent))
     lensres = 0.7  # Deflection operations will be performed at this resolution
     Lmin = 2 # The reconstruction of all lensing multipoles below that will not be attempted
@@ -325,7 +351,7 @@ def get_all(case: str):
 
     libPHASCMB = phas.lib_phas(os.path.join(lib_dir_CMB, 'phas'), 3, lmax_cmb + dlmax)
 
-    sims_cmb_len = SehgalSim(sims = SimsShegalDict, lib_dir = SIMDIR, lmax_cmb = lmax_cmb, cls_unl = cls_unl, dlmax = dlmax, lmin_dlm = 2, lib_pha = libPHASCMB)
+    sims_cmb_len = SehgalSim(sims = SimsShegalDict, lib_dir = SIMDIR, lmax_cmb = lmax_cmb, cls_unl = cls_unl, dlmax = dlmax, lmin_dlm = 2, lib_pha = libPHASCMB, extra_tlm = extra_tlm)
     sims      = simsit.cmb_maps_nlev_sehgal(sims_cmb_len = sims_cmb_len, cl_transf = transf_dat, 
                                     nlev_t = nlev_t, nlev_p = nlev_p, nside = nside, pix_lib_phas = pix_phas, zero_noise = zero_noise, fixed_noise_index = fixed_noise_index)
 
