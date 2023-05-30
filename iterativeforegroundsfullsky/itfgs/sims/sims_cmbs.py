@@ -252,8 +252,9 @@ class sims_cmb_len(object):
 
         lmaxd = hp.Alm.getlmax(dlm.size)
         #hp.almxfl(dlm, np.sqrt(np.arange(lmaxd + 1, dtype=float) * np.arange(1, lmaxd + 2)), inplace=True)
-        Qlen, Ulen = self.lens_module.alm2lenmap_spin([elm, blm], [dlm, dclm], self.nside_lens, 2,
-                                                nband=self.nbands, facres=self.facres, verbose=self.verbose)
+        Qlen, Ulen = self.lens_module.alm2lenmap_spin([elm, blm], [dlm, dclm], 2, geometry = ('healpix', {'nside': self.nside_lens}), epsilon = self.epsilon, verbose = 0)
+
+
         elm, blm = hp.map2alm_spin([Qlen, Ulen], 2, lmax=self.lmax)
         del Qlen, Ulen
         hp.write_alm(os.path.join(self.lib_dir, 'sim_%04d_elm.fits' % idx), elm)

@@ -140,7 +140,7 @@ def get_analysis_info(case):
     return analysis_info
 
 def gettemplensing(case):
-    _, _, suffixLensing, _ = get_info(case)
+    _, _, suffixLensing, _, _ = get_info(case)
     return opj(os.environ['SCRATCH'], 'n32', suffixLensing, 'lenscarfrecs')
 
 
