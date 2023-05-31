@@ -28,7 +28,7 @@ outputdir = pathlib.Path(os.environ['SCRATCH'])/"n32spectra"
 results = {}
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-v", dest = "v", type=str, help="version of the iterated maps file")
+parser.add_argument("-v", dest = "v", type=str, help="version of the iterated maps file", default = "")
 parser.add_argument("-s", dest = "s", type=str, help="study case")
 parser.add_argument("-k", dest = "k", type=str, help="key of the case", default = "ptt")
 parser.add_argument("-itmax", dest = "itmax", type=int, help="number of iterations", default = 2)
