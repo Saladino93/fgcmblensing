@@ -432,6 +432,11 @@ def get_all(case: str):
             almxfl(plm0, cpp > 0, mmax_qlm, True)
             np.save(path_plm0, plm0)
 
+
+        R = qresp.get_response(k, lmax_ivf, 'p', cls_weight = cls_len, cls_cmb = cls_grad, fal = {'e': fel, 'b': fbl, 't':ftl}, lmax_qlm=lmax_qlm)[0]
+        # Isotropic Wiener-filter (here assuming for simplicity N0 ~ 1/R)
+        WF = cpp * utils.cli(cpp + utils.cli(R))
+
         plm0 = np.load(path_plm0)
 
         #NOTE: UNLENSED RESPONSE HERE
@@ -474,8 +479,12 @@ def get_all(case: str):
         specialee = True
 
         if specialee:
-            print("Loading Special!!")
-            plm0 = np.load(f"/Users/omard/Downloads/SCRATCHFOLDER/n32/S4WebskyWebskyBorn/lenscarfrecs/pee_sim{simidx:04}/phi_plm_it000.npy")
+            print("Loading Special!!", f"/Users/omard/Downloads/SCRATCHFOLDER/n32/{suffixLensing}/cmbs/plm_in_{simidx}_lmax5120.fits")
+            #plm0 = np.load(f"/Users/omard/Downloads/SCRATCHFOLDER/n32/S4WebskyWebskyBorn/lenscarfrecs/pee_sim{simidx:04}/phi_plm_it000.npy")
+            plm0 = hp.read_alm(f"/Users/omard/Downloads/SCRATCHFOLDER/n32/{suffixLensing}/cmbs/plm_in_{simidx}_lmax5120.fits")
+            plm0 = alm_copy(plm0,  None, lmax_qlm, mmax_qlm)
+            almxfl(plm0, WF, mmax_qlm, True)       # Wiener-filter
+            almxfl(plm0, cpp > 0, mmax_qlm, True)
 
         iterator = scarf_iterator.iterator_pertmf(libdir_iterator, 'p', (lmax_qlm, mmax_qlm), datmaps,
                 plm0, mf_resp, R_unl, cpp, cls_unl, filtr, k_geom, chain_descrs(lmax_unl, cg_tol), stepper
