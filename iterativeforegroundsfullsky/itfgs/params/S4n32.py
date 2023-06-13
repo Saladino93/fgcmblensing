@@ -368,7 +368,12 @@ def get_all(case: str):
     # ---- QE libraries from plancklens to calculate unnormalized QE (qlms) and their spectra (qcls)
     mc_sims_bias = np.arange(60, dtype=int)
     mc_sims_var  = np.arange(60, 300, dtype=int)
-    qlms_dd = qest.library_sepTP(opj(TEMP, 'qlms_dd'), ivfs, ivfs,   cls_len['te'], nside, lmax_qlm=lmax_qlm)
+    fal = {}
+    fal["tt"] = ftl
+    fal["ee"] = fel
+    fal["bb"] = fbl
+    resplib = qresp.resp_lib_simple(opj(TEMP, 'qlms_dd'), lmax_ivf, cls_weight = cls_grad, cls_cmb = cls_len, fal = fal, lmax_qlm = lmax_qlm)
+    qlms_dd = qest.library_sepTP(opj(TEMP, 'qlms_dd'), ivfs, ivfs,   cls_len['te'], nside, lmax_qlm=lmax_qlm, resplib = resplib)
     qcls_dd = qecl.library(opj(TEMP, 'qcls_dd'), qlms_dd, qlms_dd, mc_sims_bias)
     # -------------------------
     # This following block is only necessary if a full, Planck-like QE lensing power spectrum analysis is desired
@@ -476,7 +481,7 @@ def get_all(case: str):
         # Sets to zero all L-modes below Lmin in the iterations:
         #NOTE: IS USING THE R_UNL RESPONSE TO OBTAIN ~ (1/Cpp + 1/N0)^-1 OK as first response?
 
-        specialee = True
+        specialee = False
 
         if specialee:
             print("Loading Special!!", f"/Users/omard/Downloads/SCRATCHFOLDER/n32/{suffixLensing}/cmbs/plm_in_{simidx}_lmax5120.fits")
