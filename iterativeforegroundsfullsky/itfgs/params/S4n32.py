@@ -28,6 +28,9 @@ from lenscarf.utils import cli
 from lenscarf.utils_hp import gauss_beam, almxfl, alm_copy
 from lenscarf.opfilt.opfilt_iso_tt_wl import alm_filter_nlev_wl as alm_filter_tt_wl
 
+from lenscarf.opfilt.opfilt_aniso_tt import alm_filter_ninv_wl as alm_filter_tt_wl_aniso
+
+
 from lenspyx.remapping.deflection_029 import deflection
 from lenspyx.remapping import utils_geom
 
@@ -260,7 +263,7 @@ def get_all(case: str):
 
     SIMDIR = opj(os.environ['SCRATCH'], 'n32', suffixCMB, 'cmbs')  # This is where the postborn are (or will be saved)
     lib_dir_CMB = opj(os.environ['SCRATCH'], 'n32', suffixCMBPhas, 'cmbs') #this is where I store phas, if already computed
-    TEMP =  opj(os.environ['SCRATCH'], 'n32', suffixLensing, 'lenscarfrecs')
+    TEMP =  opj(os.environ['SCRATCH'], 'n32', suffixLensing, 'lenscarfrecspoint')
 
     fgs = 0.
 
@@ -288,6 +291,8 @@ def get_all(case: str):
 
     lmax_ivf, mmax_ivf, beam, nlev_t, nlev_p = (4000, 4000, 1., 1., 1. * np.sqrt(2.))
 
+    nlev_t_filter = nlev_t
+
     lmin_tlm, lmin_elm, lmin_blm = (10, 10, 10) # The fiducial transfer functions are set to zero below these lmins
     # for delensing useful to cut much more B. It can also help since the cg inversion does not have to reconstruct those.
 
@@ -307,7 +312,7 @@ def get_all(case: str):
     zbounds_len = (-1.,1.) # Outside of these bounds the reconstructed maps are assumed to be zero
     pb_ctr, pb_extent = (0., 2 * np.pi) # Longitude cuts, if any, in the form (center of patch, patch extent)
     lenjob_geometry = utils_geom.Geom.get_thingauss_geometry(lmax_unl, 2) #, zbounds=zbounds_len)
-    lenjob_pbgeometry =utils_scarf.pbdGeometry(lenjob_geometry, utils_scarf.pbounds(pb_ctr, pb_extent))
+    lenjob_pbgeometry = utils_scarf.pbdGeometry(lenjob_geometry, utils_scarf.pbounds(pb_ctr, pb_extent))
     lensres = 0.7  # Deflection operations will be performed at this resolution
     Lmin = 2 # The reconstruction of all lensing multipoles below that will not be attempted
     stepper = steps.nrstep(lmax_qlm, mmax_qlm, val=0.5) # handler of the size steps in the MAP BFGS iterative search
@@ -330,12 +335,12 @@ def get_all(case: str):
     fgs = 0.
 
     # Isotropic approximation to the filtering (used eg for response calculations)
-    ftl =  cli(cls_len['tt'][:lmax_ivf + 1] + (nlev_t / 180 / 60 * np.pi) ** 2 * cli(transf_tlm ** 2) + fgs) * (transf_tlm > 0)
+    ftl =  cli(cls_len['tt'][:lmax_ivf + 1] + (nlev_t_filter / 180 / 60 * np.pi) ** 2 * cli(transf_tlm ** 2) + fgs) * (transf_tlm > 0)
     fel =  cli(cls_len['ee'][:lmax_ivf + 1] + (nlev_p / 180 / 60 * np.pi) ** 2 * cli(transf_elm ** 2)) * (transf_elm > 0)
     fbl =  cli(cls_len['bb'][:lmax_ivf + 1] + (nlev_p / 180 / 60 * np.pi) ** 2 * cli(transf_blm ** 2)) * (transf_blm > 0)
 
     # Same using unlensed spectra (used for unlensed response used to initiate the MAP curvature matrix)
-    ftl_unl =  cli(cls_unl['tt'][:lmax_ivf + 1] + (nlev_t / 180 / 60 * np.pi) ** 2 * cli(transf_tlm ** 2) + fgs) * (transf_tlm > 0)
+    ftl_unl =  cli(cls_unl['tt'][:lmax_ivf + 1] + (nlev_t_filter / 180 / 60 * np.pi) ** 2 * cli(transf_tlm ** 2) + fgs) * (transf_tlm > 0)
     fel_unl =  cli(cls_unl['ee'][:lmax_ivf + 1] + (nlev_p / 180 / 60 * np.pi) ** 2 * cli(transf_elm ** 2)) * (transf_elm > 0)
     fbl_unl =  cli(cls_unl['bb'][:lmax_ivf + 1] + (nlev_p / 180 / 60 * np.pi) ** 2 * cli(transf_blm ** 2)) * (transf_blm > 0)
 
@@ -421,6 +426,10 @@ def get_all(case: str):
 
         path_plm0 = opj(libdir_iterator, 'phi_plm_it000.npy')
         path_plm0_QE_norm = opj(libdir_iterator, 'normalized_phi_plm_it000.npy')
+
+        path_slm0 = opj(libdir_iterator, 's_slm_it000.npy')
+        path_slm0_QE_norm = opj(libdir_iterator, 'normalized_s_slm_it000.npy')
+
         if not os.path.exists(path_plm0):
             # We now build the Wiener-filtered QE here since not done already
             plm0  = qlms_dd.get_sim_qlm(k, int(simidx))  #Unormalized quadratic estimate:
@@ -436,6 +445,19 @@ def get_all(case: str):
             almxfl(plm0, WF, mmax_qlm, True)           # Wiener-filter QE
             almxfl(plm0, cpp > 0, mmax_qlm, True)
             np.save(path_plm0, plm0)
+
+        if k == "ptt_bh_s":
+            if not os.path.exists(path_slm0):
+                print("Building QE for BH FOR SOURCE")
+                bhkey = "stt_bh_p"
+                source = "s"
+                slm0 = qlms_dd.get_sim_qlm(bhkey, int(simidx))  #Unormalized quadratic estimate:
+                smf0 = 0
+                slm0 -= smf0  # MF-subtracted unnormalized QE
+                Rs = qresp.get_response(bhkey, lmax_ivf, source, cls_weight = cls_len, cls_cmb = cls_grad, fal = {'e': fel, 'b': fbl, 't':ftl}, lmax_qlm=lmax_qlm)[0]
+                slm0 = alm_copy(slm0,  None, lmax_ivf, lmax_ivf) # Just in case the QE and MAP mmax'es were not consistent
+                almxfl(slm0, utils.cli(Rs), lmax_ivf, True)
+                np.save(path_slm0_QE_norm, slm0)
 
 
         R = qresp.get_response(k, lmax_ivf, 'p', cls_weight = cls_len, cls_cmb = cls_grad, fal = {'e': fel, 'b': fbl, 't':ftl}, lmax_qlm=lmax_qlm)[0]
@@ -459,13 +481,57 @@ def get_all(case: str):
         #ffi = remapping.deflection(lenjob_pbgeometry, lensres, np.zeros_like(plm0), mmax_qlm, tr, tr)
         ffi = deflection(lenjob_geometry, np.zeros_like(plm0), mmax_qlm, numthreads=tr, verbosity=0, epsilon=epsilon)
         sht_job = utils_scarf.scarfjob()
-        sht_job.set_geometry(ninvjob_geometry)
+        #sht_job.set_geometry(ninvjob_geometry)
+        sht_job.set_geometry(lenjob_geometry)
         sht_job.set_triangular_alm_info(lmax_ivf, mmax_ivf)
         sht_job.set_nthreads(tr)
         if k in ['ptt']:
-            effective_noise = np.sqrt(nlev_t**2.+fgs*(180 * 60 / np.pi) ** 2*transf_tlm**2.)
+            effective_noise = np.sqrt(nlev_t_filter**2.+fgs*(180 * 60 / np.pi) ** 2*transf_tlm**2.)
             filtr = alm_filter_tt_wl(effective_noise, ffi, transf_tlm, (lmax_unl, mmax_unl), (lmax_ivf, mmax_ivf))
-            datmaps = sht_job.map2alm(sims_MAP.get_sim_tmap(int(simidx)))
+
+            if False:
+                fconv = 180*60/np.pi
+                fconv = fconv**2.
+                pixarea = hp.nside2pixarea(nside)
+                pixarea *= fconv
+                datmaps = sims_MAP.get_sim_tmap(int(simidx))
+                invtotalnoise = np.nan_to_num(np.ones_like(datmaps)*pixarea/nlev_t**2.)
+                zbounds     = (-1.,1.)
+                ninvjob_geometry_new = utils_scarf.Geom.get_healpix_geometry(nside, zbounds=zbounds)
+                #ninvjob_geometry_new.weight = np.ones_like(ninvjob_geometry_new.weight)
+                invtotalnoise = sims_MAP.ztruncify(invtotalnoise)
+                filtr = alm_filter_tt_wl_aniso(ninvjob_geometry_new, invtotalnoise, ffi, transf_tlm, (lmax_unl, mmax_unl), (lmax_ivf, mmax_ivf), sht_threads = tr)
+            else:
+                datmaps = sht_job.map2alm(sims_MAP.get_sim_tmap(int(simidx)))
+
+        elif k in ["ptt_bh_s"]:
+            slm0 = np.load(path_slm0_QE_norm)
+            Npix = hp.nside2npix(nside)
+            fconv = 180*60/np.pi
+            fconv = fconv**2.
+            pixarea = hp.nside2pixarea(nside)
+            pixarea *= fconv
+
+            almxfl(slm0, transf_tlm**2., lmax_ivf, True) #convolve with beam
+
+            s0 = sims_MAP.ztruncify(hp.alm2map(slm0, nside))
+            datmaps = sims_MAP.get_sim_tmap(int(simidx))
+            invtotalnoise = np.nan_to_num(np.ones_like(s0)*nlev_t_filter**2./pixarea+s0)
+            invtotalnoise = np.nan_to_num(1/invtotalnoise)
+            #sht_job.map2alm(sims_MAP.get_sim_tmap(int(simidx)))
+            #print("datmaps", len(datmaps))
+            #print("s0", len(sims_MAP.ztruncify(s0)))
+
+            invtotalnoise = sims_MAP.ztruncify(invtotalnoise)
+            
+            zbounds     = (-1.,1.) # colatitude sky cuts for noise variance maps (We could exclude all rings which are completely masked)
+
+            #ninvjob_geometry_new = utils_geom.Geom.get_thingauss_geometry(lmax_unl, 2)
+            ninvjob_geometry_new = utils_scarf.Geom.get_healpix_geometry(nside, zbounds=zbounds)
+            #ninvjob_geometry_new.weight = np.ones_like(ninvjob_geometry_new.weight)
+            
+            filtr = alm_filter_tt_wl_aniso(ninvjob_geometry_new, invtotalnoise, ffi, transf_tlm, (lmax_unl, mmax_unl), (lmax_ivf, mmax_ivf), sht_threads = tr)
+    
 
         elif k in ['p_p', 'p_eb']:
             wee = k == 'p_p' # keeps or not the EE-like terms in the generalized QEs
