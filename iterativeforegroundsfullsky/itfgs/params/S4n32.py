@@ -208,9 +208,6 @@ def get_info(caso: str) -> tuple:
         suffixCMBPhas = suffixWebsky
         suffixLensing = suffixWebsky+'WebskyBornForegrounds'
 
-        SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, 'kap.fits')
-
         fgnames = ["ksz", "tsz_2048", "cib_nu0143"]
         fgnames = ["ksz", "cib_nu0143"]
 
@@ -222,8 +219,12 @@ def get_info(caso: str) -> tuple:
 
             def __call__(self, idx):
                 return np.sum([hp.read_map(opj(baseWebsky, f'{fgname}.fits')) for fgname in self.fgnames], axis = 0)
+            
+            def get_name(self):
+                return self.name
                 
         extra_tlm = Extra('fgs', fgnames)
+
 
     elif caso == casowebskybornrand:
 
