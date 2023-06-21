@@ -33,6 +33,7 @@ from lenscarf.opfilt.opfilt_aniso_tt import alm_filter_ninv_wl as alm_filter_tt_
 
 from lenspyx.remapping.deflection_029 import deflection
 from lenspyx.remapping import utils_geom
+from lenspyx.lensing import get_geom
 
 import itfgs
 from itfgs.sims.sims_postborn import sims_postborn
@@ -263,7 +264,7 @@ def get_all(case: str):
 
     SIMDIR = opj(os.environ['SCRATCH'], 'n32', suffixCMB, 'cmbs')  # This is where the postborn are (or will be saved)
     lib_dir_CMB = opj(os.environ['SCRATCH'], 'n32', suffixCMBPhas, 'cmbs') #this is where I store phas, if already computed
-    TEMP =  opj(os.environ['SCRATCH'], 'n32', suffixLensing, 'lenscarfrecspoint')
+    TEMP =  opj(os.environ['SCRATCH'], 'n32', suffixLensing, 'lenscarfrecs')
 
     fgs = 0.
 
@@ -307,12 +308,18 @@ def get_all(case: str):
     #----------------- pixelization and geometry info for the input maps and the MAP pipeline and for lensing operations
     nside = 2048 if "websky" in case else 4096#CHECK
     zbounds     = (-1.,1.) # colatitude sky cuts for noise variance maps (We could exclude all rings which are completely masked)
-    ninvjob_geometry = utils_scarf.Geom.get_healpix_geometry(nside, zbounds=zbounds)
+    
+    geominfo = ('healpix', {'nside': nside})
+    lenjob_geometry = get_geom(geominfo)
 
-    zbounds_len = (-1.,1.) # Outside of these bounds the reconstructed maps are assumed to be zero
-    pb_ctr, pb_extent = (0., 2 * np.pi) # Longitude cuts, if any, in the form (center of patch, patch extent)
-    lenjob_geometry = utils_geom.Geom.get_thingauss_geometry(lmax_unl, 2) #, zbounds=zbounds_len)
-    lenjob_pbgeometry = utils_scarf.pbdGeometry(lenjob_geometry, utils_scarf.pbounds(pb_ctr, pb_extent))
+    
+    #ninvjob_geometry = utils_scarf.Geom.get_healpix_geometry(nside, zbounds=zbounds)
+    #zbounds_len = (-1.,1.) # Outside of these bounds the reconstructed maps are assumed to be zero
+    #pb_ctr, pb_extent = (0., 2 * np.pi) # Longitude cuts, if any, in the form (center of patch, patch extent)
+    #lenjob_geometry = utils_geom.Geom.get_thingauss_geometry(lmax_unl, 2) #, zbounds=zbounds_len)
+    #lenjob_pbgeometry = utils_scarf.pbdGeometry(lenjob_geometry, utils_scarf.pbounds(pb_ctr, pb_extent))
+
+
     lensres = 0.7  # Deflection operations will be performed at this resolution
     Lmin = 2 # The reconstruction of all lensing multipoles below that will not be attempted
     stepper = steps.nrstep(lmax_qlm, mmax_qlm, val=0.5) # handler of the size steps in the MAP BFGS iterative search
@@ -455,9 +462,11 @@ def get_all(case: str):
                 smf0 = 0
                 slm0 -= smf0  # MF-subtracted unnormalized QE
                 Rs = qresp.get_response(bhkey, lmax_ivf, source, cls_weight = cls_len, cls_cmb = cls_grad, fal = {'e': fel, 'b': fbl, 't':ftl}, lmax_qlm=lmax_qlm)[0]
-                slm0 = alm_copy(slm0,  None, lmax_ivf, lmax_ivf) # Just in case the QE and MAP mmax'es were not consistent
-                almxfl(slm0, utils.cli(Rs), lmax_ivf, True)
+
+                slm0 = alm_copy(slm0,  None, lmax_qlm, lmax_qlm) # Just in case the QE and MAP mmax'es were not consistent
+                almxfl(slm0, utils.cli(Rs), lmax_qlm, True)
                 np.save(path_slm0_QE_norm, slm0)
+
 
 
         R = qresp.get_response(k, lmax_ivf, 'p', cls_weight = cls_len, cls_cmb = cls_grad, fal = {'e': fel, 'b': fbl, 't':ftl}, lmax_qlm=lmax_qlm)[0]
@@ -505,32 +514,70 @@ def get_all(case: str):
                 datmaps = sht_job.map2alm(sims_MAP.get_sim_tmap(int(simidx)))
 
         elif k in ["ptt_bh_s"]:
+
             slm0 = np.load(path_slm0_QE_norm)
+            
+            print("lmax slm0", hp.Alm.getlmax(slm0.size))
+            
+            slm0 = utils.alm_copy(slm0, lmax_unl)
+            print("lmax slm0", hp.Alm.getlmax(slm0.size))
+
             Npix = hp.nside2npix(nside)
+
             fconv = 180*60/np.pi
             fconv = fconv**2.
+
             pixarea = hp.nside2pixarea(nside)
             pixarea *= fconv
 
-            almxfl(slm0, transf_tlm**2., lmax_ivf, True) #convolve with beam
+            #almxfl(slm0, transf_tlm**2., lmax_ivf, True) #convolve with beam
 
-            s0 = sims_MAP.ztruncify(hp.alm2map(slm0, nside))
-            datmaps = sims_MAP.get_sim_tmap(int(simidx))
-            invtotalnoise = np.nan_to_num(np.ones_like(s0)*nlev_t_filter**2./pixarea+s0)
-            invtotalnoise = np.nan_to_num(1/invtotalnoise)
+            ninvjob_geometry_new = get_geom(geominfo)
+
+            s0 = ninvjob_geometry_new.alm2map(slm0.copy(), lmax_unl, mmax_unl, ffi.sht_tr, (-1., 1.))
+        
+            #slm0_ = ninvjob_geometry_new.map2alm(s0, lmax_unl, mmax_unl, ffi.sht_tr, (-1., 1.))
+
+            #s0 = sims_MAP.ztruncify(hp.alm2map(slm0, nside))    
+        
+            datmaps_original = sims_MAP.sims.get_sim_tmap(int(simidx))
+
+            """from lenscarf import utils_hp
+            from plancklens import utils as utils_plancklens
+
+            tmap = sims_MAP.sims.sims_cmb_len.get_sim_tlm(int(simidx))
+            tmap = utils_plancklens.alm_copy(tmap, lmax_unl)
+            print(tmap)
+            print("mAX", utils_hp.Alm.getlmax(tmap.size, mmax_unl))
+            almxfl(tmap, sims_MAP.sims.cl_transf, mmax_unl, inplace=True)
+            datmaps = ninvjob_geometry_new.alm2map(tmap, lmax_unl, mmax_unl, ffi.sht_tr, (-1., 1.))"""
+            
+            ll = lmax_unl
+            
+            datmaps_alm = hp.map2alm(datmaps_original, lmax = lmax_unl, mmax = mmax_unl, iter = 0)
+
+            datmaps = ninvjob_geometry_new.alm2map(datmaps_alm.copy(), ll, ll, ffi.sht_tr, (-1., 1.))
+            datmaps_alm_ = ninvjob_geometry_new.map2alm(datmaps.copy(), ll, ll, ffi.sht_tr, (-1., 1.))
+            print("datmaps", datmaps/ninvjob_geometry_new.alm2map(datmaps_alm_, ll, ll, ffi.sht_tr, (-1., 1.)))
+            print("datamaps orig", datmaps_original/datmaps)
+
+
+            invtotalnoise = np.ones_like(s0)*nlev_t_filter**2. 
+            #invtotalnoise = np.nan_to_num(np.ones_like(s0)*nlev_t_filter**2./pixarea+s0)
+            invtotalnoise = np.nan_to_num(pixarea/invtotalnoise)
+            extra_ninv = s0
             #sht_job.map2alm(sims_MAP.get_sim_tmap(int(simidx)))
             #print("datmaps", len(datmaps))
             #print("s0", len(sims_MAP.ztruncify(s0)))
 
             invtotalnoise = sims_MAP.ztruncify(invtotalnoise)
             
-            zbounds     = (-1.,1.) # colatitude sky cuts for noise variance maps (We could exclude all rings which are completely masked)
-
+            #zbounds     = (-1.,1.) # colatitude sky cuts for noise variance maps (We could exclude all rings which are completely masked)
             #ninvjob_geometry_new = utils_geom.Geom.get_thingauss_geometry(lmax_unl, 2)
-            ninvjob_geometry_new = utils_scarf.Geom.get_healpix_geometry(nside, zbounds=zbounds)
+            #ninvjob_geometry_new = utils_scarf.Geom.get_healpix_geometry(nside, zbounds=zbounds)
             #ninvjob_geometry_new.weight = np.ones_like(ninvjob_geometry_new.weight)
-            
-            filtr = alm_filter_tt_wl_aniso(ninvjob_geometry_new, invtotalnoise, ffi, transf_tlm, (lmax_unl, mmax_unl), (lmax_ivf, mmax_ivf), sht_threads = tr)
+
+            filtr = alm_filter_tt_wl_aniso(ninvjob_geometry_new, invtotalnoise, ffi, transf_tlm, (lmax_unl, mmax_unl), (lmax_ivf, mmax_ivf), sht_threads = tr, extra_ninv = extra_ninv)
     
 
         elif k in ['p_p', 'p_eb']:
