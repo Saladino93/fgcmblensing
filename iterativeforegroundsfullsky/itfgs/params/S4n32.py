@@ -12,34 +12,30 @@ with Born approx and non linear effects
 
 import os
 from os.path import join as opj
-import numpy as np
+
 import healpy as hp
-
+import itfgs
+import itfgs.sims.sims_cmbs as simsit
+import numpy as np
 import plancklens
-
-from plancklens import utils, qresp, qest, qecl
+from itfgs.sims.sims_postborn import sims_postborn
+from lenscarf import utils_scarf, utils_sims
+from lenscarf.iterators import cs_iterator as scarf_iterator
+from lenscarf.iterators import steps
+from lenscarf.opfilt.opfilt_aniso_tt import \
+    alm_filter_ninv_wl as alm_filter_tt_wl_aniso
+from lenscarf.opfilt.opfilt_iso_tt_wl import \
+    alm_filter_nlev_wl as alm_filter_tt_wl
+from lenscarf.utils import cli
+from lenscarf.utils_hp import alm_copy, almxfl, gauss_beam
+from lenspyx.lensing import get_geom
+from lenspyx.remapping import utils_geom
+from lenspyx.remapping.deflection_029 import deflection
+from plancklens import qecl, qest, qresp, utils
+from plancklens.filt import filt_simple, filt_util
+from plancklens.helpers import mpi
 from plancklens.qcinv import cd_solve
 from plancklens.sims import maps, phas
-from plancklens.filt import filt_simple, filt_util
-
-from lenscarf import utils_scarf, utils_sims
-from lenscarf.iterators import cs_iterator as scarf_iterator, steps
-from lenscarf.utils import cli
-from lenscarf.utils_hp import gauss_beam, almxfl, alm_copy
-from lenscarf.opfilt.opfilt_iso_tt_wl import alm_filter_nlev_wl as alm_filter_tt_wl
-
-from lenscarf.opfilt.opfilt_aniso_tt import alm_filter_ninv_wl as alm_filter_tt_wl_aniso
-
-
-from lenspyx.remapping.deflection_029 import deflection
-from lenspyx.remapping import utils_geom
-from lenspyx.lensing import get_geom
-
-import itfgs
-from itfgs.sims.sims_postborn import sims_postborn
-import itfgs.sims.sims_cmbs as simsit
-
-from plancklens.helpers import mpi
 
 
 def camb_clfile_gradient(fname, lmax=None):
@@ -100,6 +96,7 @@ casowebskybornrand = "webskyrand"
 casowebskyborngauss = "webskygauss"
 
 casowebskybornfgs = "webskyfgs"
+casowebskybornfgsrand = "webskyfgsrand"
 
 cases = [casostd, casorand, casogauss, casorandlog, casolog, casorandlogdoubleskew, casologdoubleskew, casopostborn, casopostbornrand, casowebskyborn, casowebskybornrand, casowebskyborngauss]
 
@@ -209,21 +206,52 @@ def get_info(caso: str) -> tuple:
         suffixLensing = suffixWebsky+'WebskyBornForegrounds'
 
         fgnames = ["ksz", "tsz_2048", "cib_nu0143"]
-        fgnames = ["ksz", "cib_nu0143"]
+        fgnames = ["fake_ps_mappa"]
+
+        SimsShegalDict = {}
+        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, 'kap.fits')
 
         class Extra(object):
 
             def __init__(self, name, fgnames):
                 self.name = name
                 self.fgnames = fgnames
+                self.cibfactor = 2631.0726711925704
 
             def __call__(self, idx):
-                return np.sum([hp.read_map(opj(baseWebsky, f'{fgname}.fits')) for fgname in self.fgnames], axis = 0)
+                return np.sum([hp.read_map(opj(baseWebsky, f'{fgname}_{idx}.fits')) for fgname in self.fgnames], axis = 0)
             
             def get_name(self):
                 return self.name
                 
-        extra_tlm = Extra('fgs', fgnames)
+        extra_tlm = Extra('fake_ps', fgnames)
+
+    elif caso == casowebskybornfgsrand:
+
+        suffixCMB = suffixWebsky+'WebskyBorn'
+        suffixCMBPhas = suffixWebsky
+        suffixLensing = suffixWebsky+'WebskyBornForegroundsRand'
+
+        fgnames = ["ksz", "tsz_2048", "cib_nu0143"]
+        fgnames = ["randomized_fake_ps_mappa"]
+
+        SimsShegalDict = {}
+        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, 'kap.fits')
+
+        class Extra(object):
+
+            def __init__(self, name, fgnames):
+                self.name = name
+                self.fgnames = fgnames
+                self.cibfactor = 2631.0726711925704
+
+            def __call__(self, idx):
+                return np.sum([hp.read_map(opj(baseWebsky, f'{fgname}_{idx}.fits')) for fgname in self.fgnames], axis = 0)
+            
+            def get_name(self):
+                return self.name
+                
+        extra_tlm = Extra('randomized_fake_ps', fgnames)
 
 
     elif caso == casowebskybornrand:
@@ -497,7 +525,7 @@ def get_all(case: str):
         sht_job.set_nthreads(tr)
         if k in ['ptt']:
             effective_noise = np.sqrt(nlev_t_filter**2.+fgs*(180 * 60 / np.pi) ** 2*transf_tlm**2.)
-            filtr = alm_filter_tt_wl(effective_noise, ffi, transf_tlm, (lmax_unl, mmax_unl), (lmax_ivf, mmax_ivf))
+            filtr = alm_filter_tt_wl(effective_noise, ffi, transf_tlm, (lmax_unl, mmax_unl), (lmax_ivf, mmax_ivf), ivfs = ivfs)
 
             if False:
                 fconv = 180*60/np.pi
@@ -631,7 +659,7 @@ if __name__ == '__main__':
     get_itlib, libdir_iterators, chain_descrs, lmax_unl, _, _ = get_all(args.case)
 
     from plancklens.helpers import mpi
-    
+
     #from plancklens.helpers import mpi
     mpi.barrier = lambda : 1 # redefining the barrier (Why ? )
     from lenscarf.iterators.statics import rec as Rec
