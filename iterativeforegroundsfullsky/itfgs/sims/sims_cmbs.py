@@ -292,7 +292,7 @@ class sims_cmb_len(object):
         if (self.extra_tlm is not None):
             extrafname = os.path.join(self.lib_dir, f'sim_{idx:04}_{self.extra_tlm.get_name()}lm.fits')
             if (not os.path.exists(extrafname)):
-                extra_tlm = hp.map2alm(self.extra_tlm(idx), lmax=self.lmax, iter=0)
+                extra_tlm = hp.map2alm(self.extra_tlm(idx), lmax=self.lmax, iter = 0)
                 hp.write_alm(extrafname, extra_tlm)
 
         total = hp.read_alm(fname)
