@@ -199,6 +199,15 @@ def get_info(caso: str) -> tuple:
         names = ['']
         SimsShegalDict[0] = [lambda idx: opj(baseSehgal, nome) for nome in names]
 
+    elif caso == casopostborngauss:
+        
+        suffixCMB = suffix+'PostBornGauss'
+        suffixCMBPhas = suffix
+        suffixLensing = suffix+'PostBornGauss'
+
+        SimsShegalDict = {}
+        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'postbornGaussian/postborn_kappa_gauss_{idx}.fits')
+
     elif caso == casowebskyborn:
 
         suffixCMB = suffixWebsky+'WebskyBorn'
@@ -514,6 +523,8 @@ def get_all(case: str):
             else:
                 datmaps = sht_job.map2alm(sims_MAP.get_sim_tmap(int(simidx)))
 
+            wflm0 = None
+
         elif k in ["ptt_bh_s"]:
 
             slm0 = np.load(path_slm0_QE_norm)
@@ -562,7 +573,6 @@ def get_all(case: str):
             print("datmaps", datmaps/ninvjob_geometry_new.alm2map(datmaps_alm_, ll, ll, ffi.sht_tr, (-1., 1.)))
             print("datamaps orig", datmaps_original/datmaps)
 
-
             invtotalnoise = np.ones_like(s0)*nlev_t_filter**2. 
             #invtotalnoise = np.nan_to_num(np.ones_like(s0)*nlev_t_filter**2./pixarea+s0)
             invtotalnoise = np.nan_to_num(pixarea/invtotalnoise)
@@ -590,13 +600,18 @@ def get_all(case: str):
             # dat maps must now be given in harmonic space in this idealized configuration
             datmaps = np.array(sht_job.map2alm_spin(sims_MAP.get_sim_pmap(int(simidx)), 2))
 
+            wflm0 = None
+
 
         elif k in ["p"]:
             filtr = alm_filter_tp_wl(nlev_t, nlev_p, ffi, transf_tlm, (lmax_unl, mmax_unl), (lmax_ivf, mmax_ivf), transf_e = transf_elm, transf_b = transf_blm, nlev_b = nlev_p)
 
             datmapsT = sht_job.map2alm(sims_MAP.get_sim_tmap(int(simidx)))
             datmapsP = np.array(sht_job.map2alm_spin(sims_MAP.get_sim_pmap(int(simidx)), 2))
-            datmaps = np.array([datmapsT, datmapsP])
+            datmaps = np.array([datmapsT, datmapsP[0], datmapsP[1]])
+            print("datmaps PT", datmaps.shape, len(datmaps))
+            wflm0 = lambda : np.zeros((2, Alm.getsize(filtr.lmax_sol, filtr.mmax_sol)), dtype=complex).squeeze()
+            
 
         else:
             assert 0
@@ -616,7 +631,7 @@ def get_all(case: str):
 
         iterator = scarf_iterator.iterator_pertmf(libdir_iterator, 'p', (lmax_qlm, mmax_qlm), datmaps,
                 plm0, mf_resp, R_unl, cpp, cls_unl, filtr, k_geom, chain_descrs(lmax_unl, cg_tol), stepper
-                ,mf0=mf0)
+                ,mf0=mf0, wflm0 = wflm0)
         return iterator
     
     return get_itlib, libdir_iterators, chain_descrs, lmax_unl, analysis_info, sims_cmb_len
@@ -639,7 +654,7 @@ if __name__ == '__main__':
     soltn_cond = lambda it: True # Uses (or not) previous E-mode solution as input to search for current iteration one
 
 
-    if alloc:
+    if args.alloc:
         if ducc0.misc.preallocate_memory(args.alloc):
             print('gclm2lenmap: allocated %s GB'%args.alloc)
         else:
