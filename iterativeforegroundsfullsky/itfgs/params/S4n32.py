@@ -22,24 +22,30 @@ from plancklens.qcinv import cd_solve
 from plancklens.sims import maps, phas
 from plancklens.filt import filt_simple, filt_util
 
-from lenscarf import utils_scarf, utils_sims
-from lenscarf.iterators import cs_iterator as scarf_iterator, steps
-from lenscarf.utils import cli
-from lenscarf.utils_hp import gauss_beam, almxfl, alm_copy
-from lenscarf.opfilt.opfilt_iso_tt_wl import alm_filter_nlev_wl as alm_filter_tt_wl
+from delensalot.core.helper import utils_scarf
+from delensalot.utility import utils_sims
 
-from lenscarf.opfilt.opfilt_aniso_tt import alm_filter_ninv_wl as alm_filter_tt_wl_aniso
+from delensalot.core.iterator import cs_iterator as scarf_iterator, steps
+from delensalot.utils import cli
+from delensalot.utility.utils_hp import gauss_beam, almxfl, alm_copy
+from delensalot.core.opfilt.MAP_opfilt_iso_t import alm_filter_nlev_wl as alm_filter_tt_wl
+
+from delensalot.core.opfilt.MAP_opfilt_iso_tp import alm_filter_nlev_wl as alm_filter_tp_wl
+
+
+from delensalot.core.opfilt.MAP_opfilt_aniso_t import alm_filter_ninv_wl as alm_filter_tt_wl_aniso
 
 
 from lenspyx.remapping.deflection_029 import deflection
 from lenspyx.remapping import utils_geom
 from lenspyx.lensing import get_geom
 
-import itfgs
 from itfgs.sims.sims_postborn import sims_postborn
 import itfgs.sims.sims_cmbs as simsit
 
 from plancklens.helpers import mpi
+
+import ducc0
 
 
 def camb_clfile_gradient(fname, lmax=None):
@@ -94,6 +100,7 @@ casologdoubleskew = "logdoubleskew"
 
 casopostborn = "postborn"
 casopostbornrand = "postbornrand"
+casopostborngauss = "postborngauss"
 
 casowebskyborn = "websky"
 casowebskybornrand = "webskyrand"
@@ -313,14 +320,6 @@ def get_all(case: str):
     geominfo = ('healpix', {'nside': nside})
     lenjob_geometry = get_geom(geominfo)
 
-    
-    #ninvjob_geometry = utils_scarf.Geom.get_healpix_geometry(nside, zbounds=zbounds)
-    #zbounds_len = (-1.,1.) # Outside of these bounds the reconstructed maps are assumed to be zero
-    #pb_ctr, pb_extent = (0., 2 * np.pi) # Longitude cuts, if any, in the form (center of patch, patch extent)
-    #lenjob_geometry = utils_geom.Geom.get_thingauss_geometry(lmax_unl, 2) #, zbounds=zbounds_len)
-    #lenjob_pbgeometry = utils_scarf.pbdGeometry(lenjob_geometry, utils_scarf.pbounds(pb_ctr, pb_extent))
-
-
     lensres = 0.7  # Deflection operations will be performed at this resolution
     Lmin = 2 # The reconstruction of all lensing multipoles below that will not be attempted
     stepper = steps.nrstep(lmax_qlm, mmax_qlm, val=0.5) # handler of the size steps in the MAP BFGS iterative search
@@ -422,6 +421,7 @@ def get_all(case: str):
         if not os.path.exists(libdir_iterator):
             os.makedirs(libdir_iterator)
         tr = int(os.environ.get('OMP_NUM_THREADS', 8))
+        print("Using", tr, "threads")
         cpp = np.copy(cls_unl['pp'][:lmax_qlm + 1])
         cpp[:Lmin] *= 0.
 
@@ -589,6 +589,15 @@ def get_all(case: str):
                                     wee=wee, transf_b=transf_blm, nlev_b=nlev_p)
             # dat maps must now be given in harmonic space in this idealized configuration
             datmaps = np.array(sht_job.map2alm_spin(sims_MAP.get_sim_pmap(int(simidx)), 2))
+
+
+        elif k in ["p"]:
+            filtr = alm_filter_tp_wl(nlev_t, nlev_p, ffi, transf_tlm, (lmax_unl, mmax_unl), (lmax_ivf, mmax_ivf), transf_e = transf_elm, transf_b = transf_blm, nlev_b = nlev_p)
+
+            datmapsT = sht_job.map2alm(sims_MAP.get_sim_tmap(int(simidx)))
+            datmapsP = np.array(sht_job.map2alm_spin(sims_MAP.get_sim_pmap(int(simidx)), 2))
+            datmaps = np.array([datmapsT, datmapsP])
+
         else:
             assert 0
         k_geom = filtr.ffi.geom # Customizable Geometry for position-space operations in calculations of the iterated QEs etc
@@ -623,10 +632,18 @@ if __name__ == '__main__':
     parser.add_argument('-v', dest='v', type=str, default='', help='iterator version')
     parser.add_argument('-eps', dest='epsilon', type=float, default=7., help='-log10 of lensing accuracy')
     parser.add_argument('-case', dest='case', type=str, default="", help='case')
+    parser.add_argument('-alloc', dest='alloc', type=int, default=0, help='memory allocation in GB')
 
     args = parser.parse_args()
     tol_iter   = lambda it : 10 ** (- args.tol) # tolerance a fct of iterations ?
     soltn_cond = lambda it: True # Uses (or not) previous E-mode solution as input to search for current iteration one
+
+
+    if alloc:
+        if ducc0.misc.preallocate_memory(args.alloc):
+            print('gclm2lenmap: allocated %s GB'%args.alloc)
+        else:
+            print('gclm2lenmap: allocation of %s GB failed'%args.alloc)
 
     get_itlib, libdir_iterators, chain_descrs, lmax_unl, _, _ = get_all(args.case)
 
@@ -634,7 +651,7 @@ if __name__ == '__main__':
     
     #from plancklens.helpers import mpi
     mpi.barrier = lambda : 1 # redefining the barrier (Why ? )
-    from lenscarf.iterators.statics import rec as Rec
+    from delensalot.core.iterator.statics import rec as Rec
     jobs = []
     for idx in np.arange(args.imin, args.imax + 1):
         version = args.v + ('tol%.1f'%args.tol) * (args.tol != 5.) + ('eps%.1f'%args.epsilon) * (args.epsilon != 5.)
