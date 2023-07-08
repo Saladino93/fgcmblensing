@@ -123,7 +123,9 @@ class sims_cmb_unlensed(object):
         return hp.read_alm(fname)
 
 
-class sims_cmb_len(object):
+from delensalot.sims.foregrounds import pointsources
+
+class sims_cmb_len(pointsources.PointSourcesSimple):
     """Lensed CMB skies simulation library.
         Note:
             To produce the lensed CMB, the package lenspyx is mandatory
@@ -143,7 +145,15 @@ class sims_cmb_len(object):
             verbose(defaults to True): lenspyx timing info printout
     """
     def __init__(self, lib_dir, lmax, cls_unl, lib_pha=None, offsets_plm=None, offsets_cmbunl=None,
-                 dlmax=1024, nside_lens=4096, facres=0, nbands=8, verbose=True, lmin_dlm = 2, extra_tlm = None, epsilon = 1e-7):
+                 dlmax=1024, nside_lens=4096, facres=0, nbands=8, verbose=True, lmin_dlm = 2, extra_tlm = None, epsilon = 1e-7,
+                 fgargs = None):
+
+        #init from parent
+        super().__init__(nside = nside_lens)    
+
+        fgargs = {"nsrc": 1, "amp": 10, "factor": 0.5}
+        self.fgargs = fgargs
+    
         if not os.path.exists(lib_dir) and mpi.rank == 0:
             os.makedirs(lib_dir)
         mpi.barrier()
@@ -288,17 +298,36 @@ class sims_cmb_len(object):
 
             hp.write_alm(pfname, plm)
 
+        if self.fgargs is not None:
+            fpsname = os.path.join(self.lib_dir, 'sim_%04d_pslm.fits' % idx)
+            fpsrandname = os.path.join(self.lib_dir, 'sim_%04d_psrandlm.fits' % idx)
+
+            if (not os.path.exists(fpsname)):
+                print("Generating a correlated point source map")
+                plm = hp.read_alm(pfname)
+
+                self.fgargs["seed"] = idx
+                self.fgargs["plm"] = plm
+                
+                ps = self.generate_ps(**self.fgargs, method = "default") 
+                print("Randomizing ps")
+                psalm, psrandalm = self.randomized_map(ps, self.nside, return_alm = True, lmax = self.lmax)
+                #import matplotlib.pyplot as plt
+                #plt.loglog(hp.alm2cl(psalm))
+                #plt.show()
+                hp.write_alm(fpsname, psalm)
+                hp.write_alm(fpsrandname, psrandalm)
 
         if (self.extra_tlm is not None):
-            extrafname = os.path.join(self.lib_dir, f'sim_{idx:04}_{self.extra_tlm.get_name()}lm.fits')
-            if (not os.path.exists(extrafname)):
-                extra_tlm = hp.map2alm(self.extra_tlm(idx), lmax=self.lmax, iter = 0)
-                hp.write_alm(extrafname, extra_tlm)
+            #extrafname = os.path.join(self.lib_dir, f'sim_{idx:04}_{self.extra_tlm.get_name()}lm.fits')
+            #if (not os.path.exists(extrafname)):
+            extra_tlm = self.extra_tlm(idx) #hp.map2alm(self.extra_tlm(idx), lmax=self.lmax, iter = 0)
+            #hp.write_alm(extrafname, extra_tlm)
 
         total = hp.read_alm(fname)
 
-        if self.extra_tlm is not None:
-            total += hp.read_alm(extrafname)
+        if (self.extra_tlm is not None):
+            total += self.extra_tlm(idx) #hp.read_alm(extrafname)
 
         return total
 

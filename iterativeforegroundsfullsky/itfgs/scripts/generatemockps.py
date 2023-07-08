@@ -23,7 +23,7 @@ get_our_dir = lambda nside, num, amplitude: os.path.join(pointsourcesfolder, f'n
 parser = argparse.ArgumentParser(description='Generate mock point sources map and a randomized version.')
 parser.add_argument('nside', type=int, help='nside of the map', default=2048)
 parser.add_argument('num', type=int, help='number of sources', default=10000)
-parser.add_argument('amplitude', type=float, help='amplitude of sources', default=200)
+parser.add_argument('amplitude', type=float, help='amplitude of sources', default=30)
 
 args = parser.parse_args()
 nside = args.nside

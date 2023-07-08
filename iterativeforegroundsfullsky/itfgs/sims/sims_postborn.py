@@ -51,6 +51,9 @@ class sims_postborn(sims_cmbs.sims_cmb_len):
     def get_sim_kappa(self, idx: int):
         pass
 
+    def get_sim_kappa_alm(self, idx: int):
+        pass
+
     def get_sim_omega(self, idx: int):
         pass
 
@@ -61,7 +64,8 @@ class sims_postborn(sims_cmbs.sims_cmb_len):
         if not os.path.exists(fn):
             p2k = 0.5 * np.arange(self.lmax_plm + 1) * np.arange(1, self.lmax_plm + 2, dtype=float)
             #plm = utils_hp.almxfl(hp.map2alm(hp.read_map(self.path, dtype=float), lmax=self.lmax_plm), utils.cli(p2k), self.mmax_plm, False)
-            plm = utils_hp.almxfl(hp.map2alm(self.get_sim_kappa(idx), lmax = self.lmax_plm), utils.cli(p2k), self.mmax_plm, False)
+            #plm = utils_hp.almxfl(hp.map2alm(self.get_sim_kappa(idx), lmax = self.lmax_plm), utils.cli(p2k), self.mmax_plm, False)
+            plm = utils_hp.almxfl(utils.alm_copy(self.get_sim_kappa_alm(idx), lmax = self.lmax_plm), utils.cli(p2k), self.mmax_plm, False)
             if self.cache_plm:
                 hp.write_alm(fn, plm)
             return plm
