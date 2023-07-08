@@ -10,33 +10,46 @@ with Born approx and non linear effects
 
 """
 
+
 import os
 from os.path import join as opj
-
-import healpy as hp
-import itfgs
-import itfgs.sims.sims_cmbs as simsit
 import numpy as np
+import healpy as hp
+
 import plancklens
-from itfgs.sims.sims_postborn import sims_postborn
-from lenscarf import utils_scarf, utils_sims
-from lenscarf.iterators import cs_iterator as scarf_iterator
-from lenscarf.iterators import steps
-from lenscarf.opfilt.opfilt_aniso_tt import \
-    alm_filter_ninv_wl as alm_filter_tt_wl_aniso
-from lenscarf.opfilt.opfilt_iso_tt_wl import \
-    alm_filter_nlev_wl as alm_filter_tt_wl
-from lenscarf.utils import cli
-from lenscarf.utils_hp import alm_copy, almxfl, gauss_beam
-from lenspyx.lensing import get_geom
-from lenspyx.remapping import utils_geom
-from lenspyx.remapping.deflection_029 import deflection
-from plancklens import qecl, qest, qresp, utils
-from plancklens.filt import filt_simple, filt_util
-from plancklens.helpers import mpi
+
+from plancklens import utils, qresp, qest, qecl
 from plancklens.qcinv import cd_solve
 from plancklens.sims import maps, phas
+from plancklens.filt import filt_simple, filt_util
 
+from delensalot.core.helper import utils_scarf
+from delensalot.utility import utils_sims
+
+fast = False
+
+from delensalot.core.iterator import cs_iterator as scarf_iterator, steps
+if fast:
+    from delensalot.core.iterator import cs_iterator_fast as scarf_iterator
+#from lenscarf.iterators import cs_iterator as scarf_iterator, steps
+
+from delensalot.utils import cli
+from delensalot.utility.utils_hp import gauss_beam, almxfl, alm_copy, Alm
+from delensalot.core.opfilt.MAP_opfilt_iso_t import alm_filter_nlev_wl as alm_filter_tt_wl
+
+#from lenscarf.opfilt.opfilt_iso_tt_wl import alm_filter_nlev_wl as alm_filter_tt_wl
+
+from delensalot.core.opfilt.MAP_opfilt_iso_tp import alm_filter_nlev_wl as alm_filter_tp_wl
+from delensalot.core.opfilt.MAP_opfilt_aniso_t import alm_filter_ninv_wl as alm_filter_tt_wl_aniso
+
+from lenspyx.remapping.deflection_029 import deflection
+from lenspyx.remapping import utils_geom
+from lenspyx.lensing import get_geom
+
+from itfgs.sims.sims_postborn import sims_postborn
+import itfgs.sims.sims_cmbs as simsit
+
+from plancklens.helpers import mpi
 
 def camb_clfile_gradient(fname, lmax=None):
     """CAMB spectra (lenspotentialCls, lensedCls or tensCls types) returned as a dict of numpy arrays.
@@ -68,6 +81,12 @@ class SehgalSim(sims_postborn):
             print('Getting special kappa!')
         nome = self.sims[self.kappakey](idx)
         return hp.read_map(nome)
+    
+    def get_sim_kappa_alm(self, idx, verbose: bool = True):
+        if verbose:
+            print('Getting special kappa alm!')
+        nome = self.sims[self.kappakey](idx)
+        return hp.read_alm(nome)
 
 include_fgs_power = False
 
@@ -97,6 +116,7 @@ casowebskyborngauss = "webskygauss"
 
 casowebskybornfgs = "webskyfgs"
 casowebskybornfgsrand = "webskyfgsrand"
+casowebskybornfgsgauss = "webskyfgsgauss"
 
 cases = [casostd, casorand, casogauss, casorandlog, casolog, casorandlogdoubleskew, casologdoubleskew, casopostborn, casopostbornrand, casowebskyborn, casowebskybornrand, casowebskyborngauss]
 
@@ -196,7 +216,7 @@ def get_info(caso: str) -> tuple:
         suffixLensing = suffixWebsky+'WebskyBorn'
 
         SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, 'kap.fits')
+        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, 'kap_alm.fits')
 
 
     elif caso == casowebskybornfgs:
@@ -205,21 +225,25 @@ def get_info(caso: str) -> tuple:
         suffixCMBPhas = suffixWebsky
         suffixLensing = suffixWebsky+'WebskyBornForegrounds'
 
-        fgnames = ["ksz", "tsz_2048", "cib_nu0143"]
-        fgnames = ["fake_ps_mappa"]
+    
 
         SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, 'kap.fits')
+        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, 'kap_alm.fits')
+
+        #fgnames = ["ksz", "tsz_2048", "cib_nu0143"]
+        fgnames = ["pslm"]
+        newdirec = "/Users/omard/Downloads/SCRATCHFOLDER/n32/S4WebskyWebskyBorn/cmbs/"
 
         class Extra(object):
 
             def __init__(self, name, fgnames):
                 self.name = name
                 self.fgnames = fgnames
-                self.cibfactor = 2631.0726711925704
+                #self.cibfactor = 2631.0726711925704
 
             def __call__(self, idx):
-                return np.sum([hp.read_map(opj(baseWebsky, f'{fgname}_{idx}.fits')) for fgname in self.fgnames], axis = 0)
+                idx = 0
+                return np.sum([hp.read_alm(opj(newdirec, f'sim_{idx:04}_{fgname}.fits')) for fgname in self.fgnames], axis = 0)
             
             def get_name(self):
                 return self.name
@@ -232,27 +256,58 @@ def get_info(caso: str) -> tuple:
         suffixCMBPhas = suffixWebsky
         suffixLensing = suffixWebsky+'WebskyBornForegroundsRand'
 
-        fgnames = ["ksz", "tsz_2048", "cib_nu0143"]
-        fgnames = ["randomized_fake_ps_mappa"]
-
         SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, 'kap.fits')
+        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, 'kap_alm.fits')
+
+        #fgnames = ["ksz", "tsz_2048", "cib_nu0143"]
+        fgnames = ["psrandlm"]
+        newdirec = "/Users/omard/Downloads/SCRATCHFOLDER/n32/S4WebskyWebskyBorn/cmbs/"
 
         class Extra(object):
 
             def __init__(self, name, fgnames):
                 self.name = name
                 self.fgnames = fgnames
-                self.cibfactor = 2631.0726711925704
+                #self.cibfactor = 2631.0726711925704
 
             def __call__(self, idx):
-                return np.sum([hp.read_map(opj(baseWebsky, f'{fgname}_{idx}.fits')) for fgname in self.fgnames], axis = 0)
+                idx = 0
+                return np.sum([hp.read_alm(opj(newdirec, f'sim_{idx:04}_{fgname}.fits')) for fgname in self.fgnames], axis = 0)
             
             def get_name(self):
                 return self.name
                 
         extra_tlm = Extra('randomized_fake_ps', fgnames)
 
+    elif caso == casowebskybornfgsgauss:
+
+        suffixCMB = suffixWebsky+'WebskyBornGauss'
+        suffixCMBPhas = suffixWebsky
+        suffixLensing = suffixWebsky+'WebskyBornForegroundsGauss'
+
+        SimsShegalDict = {}
+        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, f'websky_kappa_gauss_alm_{idx}.fits')
+
+        #fgnames = ["ksz", "tsz_2048", "cib_nu0143"]
+        fgnames = ["psgausslm"]
+        newdirec = "/Users/omard/Downloads/SCRATCHFOLDER/n32/S4WebskyWebskyBorn/cmbs/"
+
+        class Extra(object):
+
+            def __init__(self, name, fgnames):
+                self.name = name
+                self.fgnames = fgnames
+                #self.cibfactor = 2631.0726711925704
+
+            def __call__(self, idx):
+                #idx = 0
+                print(f"GET PS GAUSS {idx}")
+                return np.sum([hp.read_alm(opj(newdirec, f'sim_{idx:04}_{fgname}.fits')) for fgname in self.fgnames], axis = 0)
+            
+            def get_name(self):
+                return self.name
+                
+        extra_tlm = Extra('gauss_fake_ps', fgnames)
 
     elif caso == casowebskybornrand:
 
@@ -261,7 +316,7 @@ def get_info(caso: str) -> tuple:
         suffixLensing = suffixWebsky+'WebskyBornRand'
 
         SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, 'kap_randomized.fits')
+        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, 'kap_randomized_alm.fits')
 
     elif caso == casowebskyborngauss:
 
@@ -270,7 +325,7 @@ def get_info(caso: str) -> tuple:
         suffixLensing = suffixWebsky+'WebskyBornGauss'
 
         SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, f'websky_kappa_gauss_{idx}.fits')
+        SimsShegalDict['kappa'] = lambda idx: opj(baseWebsky, f'websky_kappa_gauss_alm_{idx}.fits')
 
 
     else:
@@ -295,7 +350,8 @@ def get_all(case: str):
     lib_dir_CMB = opj(os.environ['SCRATCH'], 'n32', suffixCMBPhas, 'cmbs') #this is where I store phas, if already computed
     TEMP =  opj(os.environ['SCRATCH'], 'n32', suffixLensing, 'lenscarfrecs')
 
-    fgs = 0.
+    fgs = np.loadtxt("/Users/omard/Documents/projects/fgcmblensing/iterativeforegroundsfullsky/itfgs/notebooks/fit.txt")
+
 
     if "websky" in case:
         print("Cosmology for", case)
@@ -351,7 +407,10 @@ def get_all(case: str):
 
     lensres = 0.7  # Deflection operations will be performed at this resolution
     Lmin = 2 # The reconstruction of all lensing multipoles below that will not be attempted
-    stepper = steps.nrstep(lmax_qlm, mmax_qlm, val=0.5) # handler of the size steps in the MAP BFGS iterative search
+    Lcut = 200
+    step_val = np.arange(0, lmax_qlm+1, 1)
+    step_val = 0.5 #*(step_val>Lcut)
+    stepper = steps.nrstep(lmax_qlm, mmax_qlm, val=step_val) # handler of the size steps in the MAP BFGS iterative search
     mc_sims_mf_it0 = np.array([]) # sims to use to build the very first iteration mean-field (QE mean-field) Here 0 since idealized
 
 
@@ -368,7 +427,14 @@ def get_all(case: str):
     transf_d = {'t':transf_tlm, 'e':transf_elm, 'b':transf_blm}
 
     ll = np.arange(0, len(cls_len['tt']), 1)
-    fgs = 0.
+    #fgs = 0.
+
+    if include_fgs_power:
+        print("Including fgs power")
+    else:
+        print("Not including fgs power")
+
+    fgs = fgs[lmax_ivf + 1]*include_fgs_power
 
     # Isotropic approximation to the filtering (used eg for response calculations)
     ftl =  cli(cls_len['tt'][:lmax_ivf + 1] + (nlev_t_filter / 180 / 60 * np.pi) ** 2 * cli(transf_tlm ** 2) + fgs) * (transf_tlm > 0)
@@ -396,7 +462,7 @@ def get_all(case: str):
 
     libPHASCMB = phas.lib_phas(os.path.join(lib_dir_CMB, 'phas'), 3, lmax_cmb + dlmax)
 
-    sims_cmb_len = SehgalSim(sims = SimsShegalDict, lib_dir = SIMDIR, lmax_cmb = lmax_cmb, cls_unl = cls_unl, dlmax = dlmax, lmin_dlm = 2, lib_pha = libPHASCMB, extra_tlm = extra_tlm)
+    sims_cmb_len = SehgalSim(sims = SimsShegalDict, lib_dir = SIMDIR, lmax_cmb = lmax_cmb, cls_unl = cls_unl, dlmax = dlmax, lmin_dlm = 2, lib_pha = libPHASCMB, extra_tlm = extra_tlm, nside_lens = nside)
     sims      = simsit.cmb_maps_nlev_sehgal(sims_cmb_len = sims_cmb_len, cl_transf = transf_dat, 
                                     nlev_t = nlev_t, nlev_p = nlev_p, nside = nside, pix_lib_phas = pix_phas, zero_noise = zero_noise, fixed_noise_index = fixed_noise_index)
 
@@ -483,6 +549,7 @@ def get_all(case: str):
             np.save(path_plm0, plm0)
 
         if k == "ptt_bh_s":
+            wflm0 = None
             if not os.path.exists(path_slm0):
                 print("Building QE for BH FOR SOURCE")
                 bhkey = "stt_bh_p"
@@ -494,6 +561,8 @@ def get_all(case: str):
 
                 slm0 = alm_copy(slm0,  None, lmax_qlm, lmax_qlm) # Just in case the QE and MAP mmax'es were not consistent
                 almxfl(slm0, utils.cli(Rs), lmax_qlm, True)
+                print(Rs)
+                #print("Unnorm!!")
                 np.save(path_slm0_QE_norm, slm0)
 
 
@@ -525,9 +594,10 @@ def get_all(case: str):
         sht_job.set_nthreads(tr)
         if k in ['ptt']:
             effective_noise = np.sqrt(nlev_t_filter**2.+fgs*(180 * 60 / np.pi) ** 2*transf_tlm**2.)
-            filtr = alm_filter_tt_wl(effective_noise, ffi, transf_tlm, (lmax_unl, mmax_unl), (lmax_ivf, mmax_ivf), ivfs = ivfs)
+            filtr = alm_filter_tt_wl(effective_noise, ffi, transf_tlm, (lmax_unl, mmax_unl), (lmax_ivf, mmax_ivf))#, ivfs = ivfs)
 
             if False:
+                print("Building QE with ANISOTROPIC FILTERING")
                 fconv = 180*60/np.pi
                 fconv = fconv**2.
                 pixarea = hp.nside2pixarea(nside)
@@ -541,12 +611,19 @@ def get_all(case: str):
                 filtr = alm_filter_tt_wl_aniso(ninvjob_geometry_new, invtotalnoise, ffi, transf_tlm, (lmax_unl, mmax_unl), (lmax_ivf, mmax_ivf), sht_threads = tr)
             else:
                 datmaps = sht_job.map2alm(sims_MAP.get_sim_tmap(int(simidx)))
+            wflm0 = None
 
         elif k in ["ptt_bh_s"]:
 
             slm0 = np.load(path_slm0_QE_norm)
+            slm0[0] = 0
             
             print("lmax slm0", hp.Alm.getlmax(slm0.size))
+
+            import matplotlib.pyplot as plt
+            plt.loglog(hp.alm2cl(slm0))
+            plt.loglog(np.ones_like(hp.alm2cl(slm0))*nlev_t**2.)
+            plt.show()
             
             slm0 = utils.alm_copy(slm0, lmax_unl)
             print("lmax slm0", hp.Alm.getlmax(slm0.size))
@@ -591,6 +668,9 @@ def get_all(case: str):
             print("datamaps orig", datmaps_original/datmaps)
 
 
+            #fgpower = fgs*(180 * 60 / np.pi) ** 2*transf_tlm**2.
+
+
             invtotalnoise = np.ones_like(s0)*nlev_t_filter**2. 
             #invtotalnoise = np.nan_to_num(np.ones_like(s0)*nlev_t_filter**2./pixarea+s0)
             invtotalnoise = np.nan_to_num(pixarea/invtotalnoise)
@@ -600,6 +680,8 @@ def get_all(case: str):
             #print("s0", len(sims_MAP.ztruncify(s0)))
 
             invtotalnoise = sims_MAP.ztruncify(invtotalnoise)
+
+            invtotalnoise = np.nan_to_num((invtotalnoise**-1.+s0)**-1.)
             
             #zbounds     = (-1.,1.) # colatitude sky cuts for noise variance maps (We could exclude all rings which are completely masked)
             #ninvjob_geometry_new = utils_geom.Geom.get_thingauss_geometry(lmax_unl, 2)
@@ -617,6 +699,16 @@ def get_all(case: str):
                                     wee=wee, transf_b=transf_blm, nlev_b=nlev_p)
             # dat maps must now be given in harmonic space in this idealized configuration
             datmaps = np.array(sht_job.map2alm_spin(sims_MAP.get_sim_pmap(int(simidx)), 2))
+
+        elif k in ["p"]:
+            filtr = alm_filter_tp_wl(nlev_t, nlev_p, ffi, transf_tlm, (lmax_unl, mmax_unl), (lmax_ivf, mmax_ivf), transf_e = transf_elm, transf_b = transf_blm, nlev_b = nlev_p)
+
+            datmapsT = sht_job.map2alm(sims_MAP.get_sim_tmap(int(simidx)))
+            datmapsP = np.array(sht_job.map2alm_spin(sims_MAP.get_sim_pmap(int(simidx)), 2))
+            datmaps = np.array([datmapsT, datmapsP[0], datmapsP[1]])
+            print("datmaps PT", datmaps.shape, len(datmaps))
+            wflm0 = lambda : np.zeros((2, Alm.getsize(filtr.lmax_sol, filtr.mmax_sol)), dtype=complex).squeeze()
+
         else:
             assert 0
         k_geom = filtr.ffi.geom # Customizable Geometry for position-space operations in calculations of the iterated QEs etc
@@ -633,9 +725,13 @@ def get_all(case: str):
             almxfl(plm0, WF, mmax_qlm, True)       # Wiener-filter
             almxfl(plm0, cpp > 0, mmax_qlm, True)
 
-        iterator = scarf_iterator.iterator_pertmf(libdir_iterator, 'p', (lmax_qlm, mmax_qlm), datmaps,
+        if fast:            
+            iterator = scarf_iterator.iterator_cstmf(libdir_iterator, 'p', (lmax_qlm, mmax_qlm), datmaps,
+                    plm0, mf0, R_unl, cpp, cls_unl, filtr, k_geom, chain_descrs(lmax_unl, cg_tol), stepper)
+        else:
+            iterator = scarf_iterator.iterator_pertmf(libdir_iterator, 'p', (lmax_qlm, mmax_qlm), datmaps,
                 plm0, mf_resp, R_unl, cpp, cls_unl, filtr, k_geom, chain_descrs(lmax_unl, cg_tol), stepper
-                ,mf0=mf0)
+                ,mf0=mf0, wflm0 = wflm0)
         return iterator
     
     return get_itlib, libdir_iterators, chain_descrs, lmax_unl, analysis_info, sims_cmb_len
