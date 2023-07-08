@@ -27,7 +27,7 @@ from delensalot.utility import utils_sims
 
 from delensalot.core.iterator import cs_iterator as scarf_iterator, steps
 from delensalot.utils import cli
-from delensalot.utility.utils_hp import gauss_beam, almxfl, alm_copy
+from delensalot.utility.utils_hp import gauss_beam, almxfl, alm_copy, Alm
 from delensalot.core.opfilt.MAP_opfilt_iso_t import alm_filter_nlev_wl as alm_filter_tt_wl
 
 from delensalot.core.opfilt.MAP_opfilt_iso_tp import alm_filter_nlev_wl as alm_filter_tp_wl
@@ -429,7 +429,9 @@ def get_all(case: str):
         libdir_iterator = libdir_iterators(k, simidx, version)
         if not os.path.exists(libdir_iterator):
             os.makedirs(libdir_iterator)
-        tr = int(os.environ.get('OMP_NUM_THREADS', 8))
+            
+        num_threads = 8
+        tr = int(os.environ.get('OMP_NUM_THREADS', num_threads))
         print("Using", tr, "threads")
         cpp = np.copy(cls_unl['pp'][:lmax_qlm + 1])
         cpp[:Lmin] *= 0.
