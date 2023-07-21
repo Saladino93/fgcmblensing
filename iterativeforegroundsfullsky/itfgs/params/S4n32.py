@@ -392,16 +392,24 @@ def get_all(case: str):
 
     #----------------- pixelization and geometry info for the input maps and the MAP pipeline and for lensing operations
     nside = 2048 if "websky" in case else 4096#CHECK
+
     zbounds     = (-1.,1.) # colatitude sky cuts for noise variance maps (We could exclude all rings which are completely masked)
     
     geominfo = ('healpix', {'nside': nside})
+
+    #geominfo = ('thingauss', {'lmax': 4200 + 300, 'smax': 3})
+    
     lenjob_geometry = get_geom(geominfo)
 
     
     #ninvjob_geometry = utils_scarf.Geom.get_healpix_geometry(nside, zbounds=zbounds)
     #zbounds_len = (-1.,1.) # Outside of these bounds the reconstructed maps are assumed to be zero
-    #pb_ctr, pb_extent = (0., 2 * np.pi) # Longitude cuts, if any, in the form (center of patch, patch extent)
-    #lenjob_geometry = utils_geom.Geom.get_thingauss_geometry(lmax_unl, 2) #, zbounds=zbounds_len)
+    pb_ctr, pb_extent = (0., 2 * np.pi) # Longitude cuts, if any, in the form (center of patch, patch extent)
+    #lenjob_pbgeometry = lenjob_geometry #utils_geom.Geom.get_thingauss_geometry(lmax_unl, 2) #, zbounds=zbounds_len)
+    
+    geominfo_defl = ('thingauss', {'lmax': 4200 + 300, 'smax': 2})
+    lenjob_geometry_defl = get_geom(geominfo_defl)
+
     #lenjob_pbgeometry = utils_scarf.pbdGeometry(lenjob_geometry, utils_scarf.pbounds(pb_ctr, pb_extent))
 
 
@@ -586,7 +594,7 @@ def get_all(case: str):
             mf_resp = np.zeros(lmax_qlm + 1, dtype=float)
         # Lensing deflection field instance (initiated here with zero deflection)
         #ffi = remapping.deflection(lenjob_pbgeometry, lensres, np.zeros_like(plm0), mmax_qlm, tr, tr)
-        ffi = deflection(lenjob_geometry, np.zeros_like(plm0), mmax_qlm, numthreads=tr, verbosity=0, epsilon=epsilon)
+        ffi = deflection(lenjob_geometry_defl, np.zeros_like(plm0), mmax_qlm, numthreads=tr, verbosity=0, epsilon=epsilon)
         sht_job = utils_scarf.scarfjob()
         #sht_job.set_geometry(ninvjob_geometry)
         sht_job.set_geometry(lenjob_geometry)
