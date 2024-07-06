@@ -53,12 +53,12 @@ elif studycase == "born_pin":
 elif version == "nonoise":
     from itfgs.params import S4n32_low_noise as SOB_std
     from itfgs.params import S4n32_low_noise as SOB
-elif version == "flipped":
-    from itfgs.params import S4n32_flipped as SOB_std
-    from itfgs.params import S4n32_flipped as SOB
+elif "flipped" in version:
+    from itfgs.params import S4n32_flipped_3000 as SOB_std
+    from itfgs.params import S4n32_flipped_3000 as SOB
 else:
-    from itfgs.params import S4n32 as SOB_std
-    from itfgs.params import S4n32 as SOB
+    from itfgs.params import S4n32_3000 as SOB_std
+    from itfgs.params import S4n32_3000 as SOB
 
 kappa0 = 0.7446163833639607 if "logprior" in version else None
 print(f"kappa0 is {kappa0}")
@@ -260,9 +260,6 @@ def process(x):
         return x
 
 get_version = lambda x: version #if x == "" else ""
-
-get_version = lambda x: version if x == "born" else ""
-
 plms_QE_dict = {c: [np.load(f'{temps[c]}/{qe_key}_sim{i:04}{get_version(c)}/normalized_phi_plm_it000.npy') for i in simset] for c in SOdict.keys()}
 
 auto_in = {k: [hp.alm2cl(p) for p in plm_in] for k, plm_in in input_plm_maps.items()}

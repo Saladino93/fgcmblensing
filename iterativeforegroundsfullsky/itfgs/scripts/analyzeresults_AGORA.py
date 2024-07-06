@@ -12,12 +12,54 @@ import sys
 sys.path.append('../itfgs/')
 
 from plancklens.helpers import mpi
+from plancklens import utils
+from plancklens.utils import cli
 
 import argparse
 
 print(f"Rank is {mpi.rank}")
 
-outputdir = pathlib.Path(os.environ['SCRATCH'])/"n32spectra"
+########
+
+path = pathlib.Path("/users/odarwish/scratch/SKYSIMS/AGORASIMS/")
+cib = hp.read_alm(path/"cib/withcc/len/planck/agora_len_mag_cibmap_planck_545ghz_alm.fits") #(in Jy/Sr units)
+kappa = hp.read_alm(path/"cmbkappa/agora_raytrace16384_cmbkappa_highzadded_lowLcorrected_alm.fits")
+
+lmax = 5120
+cib = utils.alm_copy(cib, lmax)
+kappa = utils.alm_copy(kappa, lmax)
+
+clcross_sim = hp.alm2cl(cib, kappa)
+clkk_sim = hp.alm2cl(kappa)
+clii_sim = hp.alm2cl(cib)
+rho2_sim = clcross_sim**2/(clkk_sim*clii_sim)
+cluncorr_sim = (1-rho2_sim)*clii_sim
+
+alpha_L = clcross_sim/clii_sim
+
+
+def phi_to_kappa(phi):
+    lmax = hp.Alm.getlmax(len(phi))
+    ls = np.arange(lmax+1)
+    factor = (ls+1)*ls/2
+    return hp.almxfl(phi, factor)
+
+def kappa_to_phi(kappa):
+    lmax = hp.Alm.getlmax(len(kappa))
+    ls = np.arange(lmax+1)
+    factor = (ls+1)*ls/2
+    return hp.almxfl(kappa, cli(factor))
+
+def get_gauss_cib(phiG, seed):
+    np.random.seed(seed)
+    kappaG = phi_to_kappa(phiG)
+    cibG = hp.almxfl(kappaG, clcross_sim/clkk_sim)
+    cibG += hp.synalm(cluncorr_sim, lmax = lmax)
+    return cibG
+########
+
+
+outputdir = pathlib.Path(os.environ['SCRATCH'])/"n32spectraAGORA"
 
 results = {}
 
@@ -43,22 +85,8 @@ itmax = args.itmax+1
 imin = args.imin
 imax = args.imax
 
-
-if studycase == "rot":
-    from itfgs.params import S4n32 as SOB_std
-    from itfgs.params import S4n32_rotation as SOB
-elif studycase == "born_pin":
-    from itfgs.params import S4n32_true_phi as SOB_std
-    from itfgs.params import S4n32_true_phi as SOB
-elif version == "nonoise":
-    from itfgs.params import S4n32_low_noise as SOB_std
-    from itfgs.params import S4n32_low_noise as SOB
-elif version == "flipped":
-    from itfgs.params import S4n32_flipped as SOB_std
-    from itfgs.params import S4n32_flipped as SOB
-else:
-    from itfgs.params import S4n32 as SOB_std
-    from itfgs.params import S4n32 as SOB
+from itfgs.params import S4n32_AGORA as SOB_std
+from itfgs.params import S4n32_AGORA as SOB
 
 kappa0 = 0.7446163833639607 if "logprior" in version else None
 print(f"kappa0 is {kappa0}")
@@ -260,15 +288,24 @@ def process(x):
         return x
 
 get_version = lambda x: version #if x == "" else ""
-
-get_version = lambda x: version if x == "born" else ""
-
 plms_QE_dict = {c: [np.load(f'{temps[c]}/{qe_key}_sim{i:04}{get_version(c)}/normalized_phi_plm_it000.npy') for i in simset] for c in SOdict.keys()}
 
 auto_in = {k: [hp.alm2cl(p) for p in plm_in] for k, plm_in in input_plm_maps.items()}
 crosses_dict_qe =  {k: [hp.alm2cl(r, p) for r, p in zip(plms_QE_dict[k], plm_in)] for k, plm_in in input_plm_maps.items()}
+
+def combine_kappa_and_cib(phi, cib):
+    kappa = phi_to_kappa(phi)
+    cib_filt = hp.almxfl(cib, alpha_L)
+    return kappa_to_phi(kappa-cib_filt)
+
+
 auto =  {k: [hp.alm2cl(p, p) for p in plms] for k, plms in plms_QE_dict.items()}
 
+crosses_dict_qe_cleaned =  {k: [hp.alm2cl(combine_kappa_and_cib(couple[0], cib if "gauss" not in k else get_gauss_cib(couple[1], iMin+index)), couple[1]) for index, couple in enumerate(zip(plms_QE_dict[k], plm_in))] for k, plm_in in input_plm_maps.items()}
+auto_cleaned = {k: [hp.alm2cl(combine_kappa_and_cib(p, cib if "gauss" not in k else get_gauss_cib(input_plm_maps[k][index], iMin+index))) for index, p in enumerate(plms)] for k, plms in plms_QE_dict.items()}
+
+cib_crosses = {k: [hp.alm2cl(cib if "gauss" not in k else get_gauss_cib(p, iMin+index), p) for index, p in enumerate(plm_in)] for k, plm_in in input_plm_maps.items()}
+cib_autos = {k: [hp.alm2cl(cib if "gauss" not in k else get_gauss_cib(p, iMin+index)) for index, p in enumerate(plm_in)] for k, plm_in in input_plm_maps.items()}
 
 del plms_QE_dict
 
@@ -278,6 +315,11 @@ mean = lambda x: np.mean(x, axis = 0)
 results["auto_in"] = auto_in
 results["crosses_qe"] = crosses_dict_qe
 results["auto_qe"] = auto
+
+results["crosses_qe_cleaned"] = crosses_dict_qe_cleaned
+results["auto_qe_cleaned"] = auto_cleaned
+results["cib_crosses"] = cib_crosses
+results["cib_autos"] = cib_autos
 
 from delensalot.core.iterator import statics
 

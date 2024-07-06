@@ -1,8 +1,8 @@
 #!/bin/sh -l
 #SBATCH --job-name=lenscarf
-#SBATCH --time=06:00:00
-#SBATCH --ntasks-per-node=2
-#SBATCH --cpus-per-task=12
+#SBATCH --time=20:00:00
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=24
 #SBATCH --constraint=gpu
 #SBATCH --nodes=16
 #SBATCH --output=/scratch/snx3000/odarwish/slurms/lenscarf-slurm-%J.out
@@ -13,52 +13,17 @@ module load daint-gpu
 module load cray-python/3.9.4.1
 source /users/odarwish/bin/lenscarf/bin/activate
 
-export OMP_NUM_THREADS=12
+export OMP_NUM_THREADS=24
 export OMP_PLACES=threads
 export OMP_PROC_BIND=false
 
-#srun python ./itfgs/params/S4n32.py -k ptt_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postborn" -v "" 
-#srun python ./itfgs/params/S4n32.py -k ptt_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postbornrand" -v "" 
-#srun python ./itfgs/params/S4n32.py -k ptt_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postborngauss" -v "" 
 
-srun python ./itfgs/params/S4n32.py -k p_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postborn" -v "" 
-srun python ./itfgs/params/S4n32.py -k p_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postbornrand" -v "" 
-srun python ./itfgs/params/S4n32.py -k p_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postborngauss" -v "" 
 
-srun python ./itfgs/params/S4n32.py -k ptt_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "" -v ""
-srun python ./itfgs/params/S4n32.py -k ptt_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "rand" -v ""
-srun python ./itfgs/params/S4n32.py -k ptt_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "gauss" -v ""
 
-srun python ./itfgs/params/S4n32.py -k p_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "" -v ""
-srun python ./itfgs/params/S4n32.py -k p_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "rand" -v ""
-srun python ./itfgs/params/S4n32.py -k p_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "gauss" -v ""
+srun python ./itfgs/params/S4n32_mean_field_new.py -k ptt -imin 0 -imax 15 -itmax 4 -tol 8 -case "rand" -v "mf_new"
+srun python ./itfgs/params/S4n32_mean_field_new.py -k ptt -imin 0 -imax 15 -itmax 4 -tol 8 -case "" -v "mf_new"
+srun python ./itfgs/params/S4n32_mean_field_new.py -k ptt -imin 0 -imax 15 -itmax 4 -tol 8 -case "gauss" -v "mf_new"
 
-#srun python ./itfgs/params/S4n32.py -k ptt -imin 0 -imax 63 -itmax 6 -tol 7 -case "" -v "empirical"
-#srun python ./itfgs/params/S4n32.py -k ptt -imin 0 -imax 63 -itmax 6 -tol 7 -case "rand" -v "empirical" 
-#srun python ./itfgs/params/S4n32.py -k ptt -imin 0 -imax 63 -itmax 6 -tol 7 -case "gauss" -v "empirical" 
-#srun python ./itfgs/scripts/analyzeresults.py -k "ptt" -imin 0 -imax 63 -itmax 6 -v "empirical" -s "born"
-
-#srun python ./itfgs/params/S4n32.py -k p_p -imin 0 -imax 63 -itmax 6 -tol 8 -case "postborn" -v ""
-#srun python ./itfgs/params/S4n32.py -k p_p -imin 0 -imax 63 -itmax 6 -tol 8 -case "postbornrand" -v ""
-#srun python ./itfgs/params/S4n32.py -k p_p -imin 0 -imax 63 -itmax 6 -tol 8 -case "postborngauss" -v ""
-#srun python ./itfgs/scripts/analyzeresults.py -k "p_p" -imin 0 -imax 63 -itmax 6 -v "" -s "postborn"
-
-#srun python ./itfgs/params/S4n32.py -k p -imin 0 -imax 63 -itmax 3 -tol 7 -case "" -v ""
-#srun python ./itfgs/params/S4n32.py -k p -imin 0 -imax 63 -itmax 3 -tol 7 -case "rand" -v ""
-#srun python ./itfgs/params/S4n32.py -k p -imin 0 -imax 63 -itmax 3 -tol 7 -case "gauss" -v ""
-#srun python ./itfgs/scripts/analyzeresults.py -k "p" -imin 0 -imax 63 -itmax 3 -v "" -s "born"
-
-#srun python ./itfgs/params/S4n32.py -k ptt -imin 0 -imax 31 -itmax 1 -tol 7 -case "" -v "no_prior"
-#srun python ./itfgs/params/S4n32.py -k ptt -imin 0 -imax 31 -itmax 1 -tol 7 -case "rand" -v "no_prior"
-#srun python ./itfgs/params/S4n32.py -k ptt -imin 0 -imax 31 -itmax 1 -tol 7 -case "gauss" -v "no_prior"
-
-#srun python ./itfgs/params/S4n32_true_phi.py -k ptt -imin 0 -imax 31 -itmax 1 -tol 7 -case "" -v "pin_WF_noisy"
-#srun python ./itfgs/params/S4n32_true_phi.py -k ptt -imin 0 -imax 31 -itmax 1 -tol 7 -case "rand" -v "pin_WF_noisy"
-#srun python ./itfgs/params/S4n32_true_phi.py -k ptt -imin 0 -imax 31 -itmax 1 -tol 7 -case "gauss" -v "pin_WF_noisy"
-
-#srun python ./itfgs/scripts/analyzeresults.py -k "ptt" -imin 0 -imax 31 -itmax 1 -v "pin_WF_noisy" -s "born_pin"
-
-#srun python ./itfgs/params/S4n32_mean_field_new.py -k ptt -imin 0 -imax 15 -itmax 4 -tol 8 -case "" -v "mf_new"
 
 #srun python ./itfgs/params/S4n32_lmax_5000.py -k ptt -imin 0 -imax 0 -itmax 9 -tol 8 -case "rand"
 

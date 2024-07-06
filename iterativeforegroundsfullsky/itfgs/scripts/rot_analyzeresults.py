@@ -11,6 +11,8 @@ from os.path import join as opj
 import sys
 sys.path.append('../itfgs/')
 
+from itfgs.params import S4n32_rotation as SOB
+
 from plancklens.helpers import mpi
 
 import argparse
@@ -43,24 +45,7 @@ itmax = args.itmax+1
 imin = args.imin
 imax = args.imax
 
-
-if studycase == "rot":
-    from itfgs.params import S4n32 as SOB_std
-    from itfgs.params import S4n32_rotation as SOB
-elif studycase == "born_pin":
-    from itfgs.params import S4n32_true_phi as SOB_std
-    from itfgs.params import S4n32_true_phi as SOB
-elif version == "nonoise":
-    from itfgs.params import S4n32_low_noise as SOB_std
-    from itfgs.params import S4n32_low_noise as SOB
-elif version == "flipped":
-    from itfgs.params import S4n32_flipped as SOB_std
-    from itfgs.params import S4n32_flipped as SOB
-else:
-    from itfgs.params import S4n32 as SOB_std
-    from itfgs.params import S4n32 as SOB
-
-kappa0 = 0.7446163833639607 if "logprior" in version else None
+kappa0 = 0.8869370911600892 if "logprior" in version else None
 print(f"kappa0 is {kappa0}")
 #kappa0 = None
 
@@ -106,8 +91,6 @@ cases = SOB.cases
 get_info = SOB.get_info
 get_all = SOB.get_all
 
-get_all_std = SOB_std.get_all
-get_info_std = SOB_std.get_info
 
 #Simulationsdir = pathlib.Path(os.environ['SCRATCH'])/'SKYSIMS/GIULIOSIMS/'
 
@@ -139,26 +122,22 @@ keyWr = "NL Websky Born Rand"
 keyWg = "NL Websky Born Gauss"
 
 if studycase == "lognormal":
-    cases = [SOB.casolog, SOB.casorandlog, SOB.casogauss]
-    keys = [keyPL, keyPLr, keyPBg]#, keyBLr, keyBL]
-elif studycase == "postlog":
-    cases = [SOB.casopblog, SOB.casopblogrand, SOB.casopostborngauss]
+    cases = [SOB.casolog, SOB.casopostlogrand, SOB.casogauss]
     keys = [keyPL, keyPLr, keyPBg]#, keyBLr, keyBL]
 elif studycase == "lognormaldoubleskew":
     cases = [SOB.casologdoubleskew, SOB.casorandlogdoubleskew, SOB.casogausslogdoubleskew]
     keys = [keyPLs, keyPLsr, keyPBg]#, keyBLr, keyBL]
 elif studycase == "born":
-    cases = [SOB.casostd, SOB.casorand, SOB.casorand] if "delensing" in version else [SOB.casostd, SOB.casorand, SOB.casogauss]
-    keys = [keyB, keyBr, keyBg]
-elif studycase == "born_pin":
     cases = [SOB.casostd, SOB.casorand, SOB.casogauss]
     keys = [keyB, keyBr, keyBg]
 elif studycase == "rot":
+    #cases = [SOB.casorot, SOB.casorotrand, SOB.casorotgauss]
+    #keys = [keyB, keyBr, keyBg]
     cases = [SOB.casorot, SOB.casopostborn, SOB.casorotgauss]
-    keys = [keyB, keyBr, keyBg]
-elif studycase == "bornflipped":#assumes the flipped Gaussian/Randomized do not give any difference compared to the standard one
-    cases = [SOB.casostd, SOB.casostdflip, SOB.casogauss]
-    keys = [keyB, keyBFlipped, keyBg]
+    keys = [keyB, keyPB, keyBg]
+elif studycase == "bornflipped":
+    cases = [SOB.casostdflip, SOB.casorand, SOB.casogauss]
+    keys = [keyBFlipped, keyBr, keyBg]
 elif studycase == "postborn":
     cases = [SOB.casopostborn, SOB.casopostbornrand, SOB.casopostborngauss]
     keys = [keyPB, keyPBr, keyBg]
@@ -171,24 +150,15 @@ SOdict = {k: c for k, c in zip(cases, keys)}
 print("Dict of cases and keys: ", SOdict)
 
 def get_sim_len_lib(case):
-    if "rot" in case:
-        _, _, _, _, analysis_info, sims_cmb_len = get_all(case)
-    else:
-        _, _, _, _, analysis_info, sims_cmb_len = get_all_std(case)
+    _, _, _, _, analysis_info, sims_cmb_len = get_all(case)
     return sims_cmb_len
 
 def get_analysis_info(case):
-    if "rot" in case:
-        _, _, _, _, analysis_info, _ = get_all(case)
-    else:
-        _, _, _, _, analysis_info, _ = get_all_std(case)
+    _, _, _, _, analysis_info, _ = get_all(case)
     return analysis_info
 
 def gettemplensing(case):
-    if "rot" in case:
-        _, _, suffixLensing, _, _ = get_info(case)
-    else:
-        _, _, suffixLensing, _, _ = get_info_std(case)
+    _, _, suffixLensing, _, _ = get_info(case)
     return opj(os.environ['SCRATCH'], 'n32OFFICIAL', suffixLensing, 'lenscarfrecs')
 
 
@@ -251,19 +221,7 @@ temps = {c: gettemplensing(c) for c in cases}
 
 from delensalot.core.iterator import statics
 
-process = lambda x: np.split(x, 2)[0] if ((studycase == "rot") or (qe_key == "ptt_bh_s")) else x
-
-def process(x):
-    if ((studycase == "rot") or (qe_key == "ptt_bh_s")):
-        return np.split(x, 2)[0] if len(x) % 2 == 0 else x
-    else:
-        return x
-
-get_version = lambda x: version #if x == "" else ""
-
-get_version = lambda x: version if x == "born" else ""
-
-plms_QE_dict = {c: [np.load(f'{temps[c]}/{qe_key}_sim{i:04}{get_version(c)}/normalized_phi_plm_it000.npy') for i in simset] for c in SOdict.keys()}
+plms_QE_dict = {c: [np.load(f'{temps[c]}/{qe_key}_sim{i:04}{version}/normalized_phi_plm_it000.npy') for i in simset] for c in SOdict.keys()}
 
 auto_in = {k: [hp.alm2cl(p) for p in plm_in] for k, plm_in in input_plm_maps.items()}
 crosses_dict_qe =  {k: [hp.alm2cl(r, p) for r, p in zip(plms_QE_dict[k], plm_in)] for k, plm_in in input_plm_maps.items()}
@@ -283,7 +241,7 @@ from delensalot.core.iterator import statics
 
 iters = [i for i in range(itmax)]
 
-plms_dict = {c: [statics.rec.load_plms(f'{temps[c]}/{qe_key}_sim{i:04}{get_version(c)}/', iters, kappa0 = kappa0) for i in simset] for c in SOdict.keys()}
+plms_dict = {c: [statics.rec.load_plms(f'{temps[c]}/{qe_key}_sim{i:04}{version}/', iters, kappa0 = kappa0) for i in simset] for c in SOdict.keys()}
 
 rho_iters_dict = {}
 crosses_dict = {}
@@ -300,7 +258,7 @@ combined_dict = {}
 for k, plms in plms_dict.items(): 
     #plms list over simulation indices
     auto_in_temp = auto_in[k] #one for each simulation index
-    combined_ = np.array([[[hp.alm2cl(process(p_), pin), hp.alm2cl(process(p_))] for p_ in plm_] for plm_, pin in zip(plms, input_plm_maps[k])])
+    combined_ = np.array([[[hp.alm2cl(p_[:pin.size], pin), hp.alm2cl(p_[:pin.size])] for p_ in plm_] for plm_, pin in zip(plms, input_plm_maps[k])])
     #combined_dict[k] = combined_
     #cs_ = np.array([[hp.alm2cl(p_, pin) for p_ in plm_] for plm_, pin in zip(plms, input_plm_maps[k])])
     #as_ = np.array([[hp.alm2cl(p_) for p_ in plm_] for plm_ in plms])
@@ -326,7 +284,7 @@ plm_in_ins_born_gaussian = input_plm_maps_born_gaussian #{k: palm_copy(d, lmax =
 
 auto_in_born_gaussian = np.array([hp.alm2cl(palm_copy(plm_in, lmax = lmax_qlm)) for plm_in in plm_in_ins_born_gaussian.values()])
 
-crosses_born_gaussian = np.array([[hp.alm2cl(palm_copy(plm_in, lmax = lmax_qlm), process(plm_rec)) for plm_rec in statics.rec.load_plms(f'{gettemplensing(cases[-1])}/{qe_key}_sim{k:04}{get_version(cases[-1])}', iters, kappa0 = kappa0)] for k, plm_in in plm_in_ins_born_gaussian.items()])
+crosses_born_gaussian = np.array([[hp.alm2cl(palm_copy(plm_in, lmax = lmax_qlm), plm_rec[:palm_copy(plm_in, lmax = lmax_qlm).size]) for plm_rec in statics.rec.load_plms(f'{gettemplensing(cases[-1])}/{qe_key}_sim{k:04}{version}', iters, kappa0 = kappa0)] for k, plm_in in plm_in_ins_born_gaussian.items()])
 
 results["auto_in_born_gaussian"] = auto_in_born_gaussian
 results["crosses_born_gaussian"] = crosses_born_gaussian

@@ -12,12 +12,127 @@ import sys
 sys.path.append('../itfgs/')
 
 from plancklens.helpers import mpi
+from plancklens import utils
+from plancklens.utils import cli
 
 import argparse
 
 print(f"Rank is {mpi.rank}")
 
-outputdir = pathlib.Path(os.environ['SCRATCH'])/"n32spectra"
+########
+
+path = pathlib.Path("/users/odarwish/scratch/SKYSIMS/GIULIOSIMS/")
+cib = hp.read_alm(path/"I_len_alm.fits")
+cib_unl = hp.read_alm(path/"I_alm.fits")
+g = hp.read_alm(path/"g_len_alm.fits")
+g_unl = hp.read_alm(path/"g_alm.fits")
+kappa = hp.read_alm(path/"map0_kappa_ecp262_dmn2_lmax8000_alm.fits")
+
+lmax = 5120
+cib = utils.alm_copy(cib, lmax)
+cib_unl = utils.alm_copy(cib_unl, lmax)
+g = utils.alm_copy(g, lmax)
+g_unl = utils.alm_copy(g_unl, lmax)
+kappa = utils.alm_copy(kappa, lmax)
+
+clcross_sim = hp.alm2cl(cib, kappa)
+clkk_sim = hp.alm2cl(kappa)
+clii_sim = hp.alm2cl(cib)
+rho2_sim = clcross_sim**2/(clkk_sim*clii_sim)
+cluncorr_sim = (1-rho2_sim)*clii_sim
+
+clcross_sim_unl = hp.alm2cl(cib_unl, kappa)
+clkk_sim_unl = hp.alm2cl(kappa)
+clii_sim_unl = hp.alm2cl(cib_unl)
+rho2_sim_unl = clcross_sim_unl**2/(clkk_sim_unl*clii_sim_unl)
+cluncorr_sim_unl = (1-rho2_sim_unl)*clii_sim_unl
+
+clcross_g_sim = hp.alm2cl(g, kappa)
+clcross_g_I_sim = hp.alm2cl(g, cib)
+clgg_sim = hp.alm2cl(g)
+
+clcross_g_sim_unl = hp.alm2cl(g_unl, kappa)
+clcross_g_I_sim_unl = hp.alm2cl(g_unl, cib_unl)
+clgg_sim_unl = hp.alm2cl(g_unl)
+rhog2_sim = clcross_g_sim**2/(clgg_sim*clkk_sim)
+cluncorr_g_sim = (1-rhog2_sim)*clgg_sim
+rhog2_sim_unl = clcross_g_sim_unl**2/(clgg_sim_unl*clkk_sim)
+cluncorr_g_sim_unl = (1-rhog2_sim_unl)*clgg_sim_unl
+
+
+
+alpha_L = clcross_sim/clii_sim
+alpha_L_unl = clcross_sim_unl/clii_sim_unl
+
+
+def phi_to_kappa(phi):
+    lmax = hp.Alm.getlmax(len(phi))
+    ls = np.arange(lmax+1)
+    factor = (ls+1)*ls/2
+    return hp.almxfl(phi, factor)
+
+def kappa_to_phi(kappa):
+    lmax = hp.Alm.getlmax(len(kappa))
+    ls = np.arange(lmax+1)
+    factor = (ls+1)*ls/2
+    return hp.almxfl(kappa, cli(factor))
+
+def get_gauss_cib(phiG, seed):
+    np.random.seed(seed)
+    kappaG = phi_to_kappa(phiG)
+    cibG = hp.almxfl(kappaG, clcross_sim/clkk_sim)
+    cibG += hp.synalm(cluncorr_sim, lmax = lmax)
+    return cibG
+
+def get_gauss_cib_unl(phiG, seed):
+    np.random.seed(seed)
+    kappaG = phi_to_kappa(phiG)
+    cibG = hp.almxfl(kappaG, clcross_sim_unl/clkk_sim_unl)
+    cibG += hp.synalm(cluncorr_sim_unl, lmax = lmax)
+    return cibG
+
+
+def get_gauss_correlated(phiG, seed, clAA, clBB, clAB):
+    np.random.seed(seed)
+    kappaG = phi_to_kappa(phiG)
+    cibG = hp.almxfl(kappaG, clAB/clAA)
+    cluncorr = clBB - clAB**2/clAA
+    cibG += hp.synalm(cluncorr, lmax = lmax)
+    return cibG
+
+def get_gauss_correlated_multiple(phiG, seed, clAA, clBB, clCC, clAB, clAC, clBC):
+    Bcorr = get_gauss_correlated(phiG, seed, clAA, clBB, clAB)
+    Acorr = phi_to_kappa(phiG)
+    matrix = np.array([[clAA, clAB], [clAB, clBB]])
+    matrix = np.swapaxes(matrix, 2, 0)
+    matrix = np.swapaxes(matrix, 1, 2)
+    inv_matrix = np.zeros_like(matrix)
+    inv_matrix[2:, ...] = np.nan_to_num(np.linalg.inv(matrix[2:, ...]), posinf = 0)
+    vector = np.array([clAC, clBC]) #shape (2, lmax+1)
+    coeff = np.einsum('lij,jl->il', inv_matrix, vector)
+    coeffA, coeffB = coeff[0], coeff[1]
+    cluncorr = clCC - (coeffA**2*clAA + coeffB**2*clBB + 2*coeffA*coeffB*clAB)
+    np.random.seed(seed+1000)
+    result = hp.almxfl(Acorr, coeffA)+hp.almxfl(Bcorr, coeffB)
+    result += hp.synalm(cluncorr, lmax = lmax)
+    return result
+
+
+def get_gauss_g(phiG, seed):
+    return get_gauss_correlated_multiple(phiG, seed, clkk_sim, clii_sim, clgg_sim, clcross_sim, clcross_g_sim, clcross_g_I_sim)
+
+def get_gauss_g_unl(phiG, seed):
+    return get_gauss_correlated_multiple(phiG, seed, clkk_sim_unl, clii_sim_unl, clgg_sim_unl, clcross_sim_unl, clcross_g_sim_unl, clcross_g_I_sim_unl)
+
+#ll = np.arange(clkk_sim.size)
+#f = ll*(ll+1)/2
+#f = 1/f
+#f[0] = 0
+
+########
+
+
+outputdir = pathlib.Path(os.environ['SCRATCH'])/"n32spectraDEMUNI"
 
 results = {}
 
@@ -43,26 +158,19 @@ itmax = args.itmax+1
 imin = args.imin
 imax = args.imax
 
-
-if studycase == "rot":
-    from itfgs.params import S4n32 as SOB_std
-    from itfgs.params import S4n32_rotation as SOB
-elif studycase == "born_pin":
-    from itfgs.params import S4n32_true_phi as SOB_std
-    from itfgs.params import S4n32_true_phi as SOB
-elif version == "nonoise":
-    from itfgs.params import S4n32_low_noise as SOB_std
-    from itfgs.params import S4n32_low_noise as SOB
-elif version == "flipped":
-    from itfgs.params import S4n32_flipped as SOB_std
-    from itfgs.params import S4n32_flipped as SOB
-else:
+if version != "SO":
+    out_version = ""
     from itfgs.params import S4n32 as SOB_std
     from itfgs.params import S4n32 as SOB
+else:
+    from itfgs.params import SOn32 as SOB_std
+    from itfgs.params import SOn32 as SOB
+    out_version = version
+    version = ""     
 
 kappa0 = 0.7446163833639607 if "logprior" in version else None
 print(f"kappa0 is {kappa0}")
-#kappa0 = None
+#\kappa0 = None
 
 from healpy import Alm
 
@@ -149,6 +257,7 @@ elif studycase == "lognormaldoubleskew":
     keys = [keyPLs, keyPLsr, keyPBg]#, keyBLr, keyBL]
 elif studycase == "born":
     cases = [SOB.casostd, SOB.casorand, SOB.casorand] if "delensing" in version else [SOB.casostd, SOB.casorand, SOB.casogauss]
+    cases = [SOB.casostd, SOB.casogauss, SOB.casogauss]
     keys = [keyB, keyBr, keyBg]
 elif studycase == "born_pin":
     cases = [SOB.casostd, SOB.casorand, SOB.casogauss]
@@ -260,15 +369,43 @@ def process(x):
         return x
 
 get_version = lambda x: version #if x == "" else ""
-
-get_version = lambda x: version if x == "born" else ""
-
 plms_QE_dict = {c: [np.load(f'{temps[c]}/{qe_key}_sim{i:04}{get_version(c)}/normalized_phi_plm_it000.npy') for i in simset] for c in SOdict.keys()}
 
 auto_in = {k: [hp.alm2cl(p) for p in plm_in] for k, plm_in in input_plm_maps.items()}
 crosses_dict_qe =  {k: [hp.alm2cl(r, p) for r, p in zip(plms_QE_dict[k], plm_in)] for k, plm_in in input_plm_maps.items()}
+crosses_dict_qe_galaxy =  {k: [hp.alm2cl(couple[0], g if "gauss" not in k else get_gauss_g(couple[1], iMin+index)) for index, couple in enumerate(zip(plms_QE_dict[k], plm_in))] for k, plm_in in input_plm_maps.items()}
+crosses_dict_qe_galaxy_unlensed =  {k: [hp.alm2cl(couple[0], g if "gauss" not in k else get_gauss_g_unl(couple[1], iMin+index)) for index, couple in enumerate(zip(plms_QE_dict[k], plm_in))] for k, plm_in in input_plm_maps.items()}
+
+
+
+def combine_kappa_and_cib(phi, cib):
+    kappa = phi_to_kappa(phi)
+    cib_filt = hp.almxfl(cib, alpha_L)
+    return kappa_to_phi(kappa-cib_filt)
+
+
 auto =  {k: [hp.alm2cl(p, p) for p in plms] for k, plms in plms_QE_dict.items()}
 
+crosses_dict_qe_cleaned =  {k: [hp.alm2cl(combine_kappa_and_cib(couple[0], cib if "gauss" not in k else get_gauss_cib(couple[1], iMin+index)), couple[1]) for index, couple in enumerate(zip(plms_QE_dict[k], plm_in))] for k, plm_in in input_plm_maps.items()}
+auto_cleaned = {k: [hp.alm2cl(combine_kappa_and_cib(p, cib if "gauss" not in k else get_gauss_cib(input_plm_maps[k][index], iMin+index))) for index, p in enumerate(plms)] for k, plms in plms_QE_dict.items()}
+crosses_dict_qe_cleaned_galaxy = {k: [hp.alm2cl(combine_kappa_and_cib(couple[0], cib if "gauss" not in k else get_gauss_cib(couple[1], iMin+index)), g if "gauss" not in k else get_gauss_g(couple[1], iMin+index)) for index, couple in enumerate(zip(plms_QE_dict[k], plm_in))] for k, plm_in in input_plm_maps.items()}
+
+crosses_dict_qe_cleaned_unl =  {k: [hp.alm2cl(combine_kappa_and_cib(couple[0], cib_unl if "gauss" not in k else get_gauss_cib_unl(couple[1], iMin+index)), couple[1]) for index, couple in enumerate(zip(plms_QE_dict[k], plm_in))] for k, plm_in in input_plm_maps.items()}
+auto_cleaned_unl = {k: [hp.alm2cl(combine_kappa_and_cib(p, cib_unl if "gauss" not in k else get_gauss_cib_unl(input_plm_maps[k][index], iMin+index))) for index, p in enumerate(plms)] for k, plms in plms_QE_dict.items()}
+crosses_dict_qe_galaxy_unlensed_cleaned = {k: [hp.alm2cl(combine_kappa_and_cib(couple[0], cib_unl if "gauss" not in k else get_gauss_cib_unl(couple[1], iMin+index)), g if "gauss" not in k else get_gauss_g_unl(couple[1], iMin+index)) for index, couple in enumerate(zip(plms_QE_dict[k], plm_in))] for k, plm_in in input_plm_maps.items()}
+
+
+cib_crosses = {k: [hp.alm2cl(cib if "gauss" not in k else get_gauss_cib(p, iMin+index), p) for index, p in enumerate(plm_in)] for k, plm_in in input_plm_maps.items()}
+cib_autos = {k: [hp.alm2cl(cib if "gauss" not in k else get_gauss_cib(p, iMin+index)) for index, p in enumerate(plm_in)] for k, plm_in in input_plm_maps.items()}
+
+gal_crosses = {k: [hp.alm2cl(g if "gauss" not in k else get_gauss_g(p, iMin+index), p) for index, p in enumerate(plm_in)] for k, plm_in in input_plm_maps.items()}
+gal_autos = {k: [hp.alm2cl(g if "gauss" not in k else get_gauss_g(p, iMin+index)) for index, p in enumerate(plm_in)] for k, plm_in in input_plm_maps.items()}
+
+cib_crosses_unl = {k: [hp.alm2cl(cib_unl if "gauss" not in k else get_gauss_cib_unl(p, iMin+index), p) for index, p in enumerate(plm_in)] for k, plm_in in input_plm_maps.items()}
+cib_autos_unl = {k: [hp.alm2cl(cib_unl if "gauss" not in k else get_gauss_cib_unl(p, iMin+index)) for index, p in enumerate(plm_in)] for k, plm_in in input_plm_maps.items()}
+
+gal_crosses_unl = {k: [hp.alm2cl(g if "gauss" not in k else get_gauss_g_unl(p, iMin+index), p) for index, p in enumerate(plm_in)] for k, plm_in in input_plm_maps.items()}
+gal_autos_unl = {k: [hp.alm2cl(g if "gauss" not in k else get_gauss_g_unl(p, iMin+index)) for index, p in enumerate(plm_in)] for k, plm_in in input_plm_maps.items()}
 
 del plms_QE_dict
 
@@ -278,6 +415,25 @@ mean = lambda x: np.mean(x, axis = 0)
 results["auto_in"] = auto_in
 results["crosses_qe"] = crosses_dict_qe
 results["auto_qe"] = auto
+
+results["crosses_qe_cleaned"] = crosses_dict_qe_cleaned
+results["auto_qe_cleaned"] = auto_cleaned
+results["cib_crosses"] = cib_crosses
+results["cib_autos"] = cib_autos
+
+results["crosses_qe_cleaned_unl"] = crosses_dict_qe_cleaned_unl
+results["auto_qe_cleaned_unl"] = auto_cleaned_unl
+results["cib_crosses_unl"] = cib_crosses_unl
+results["cib_autos_unl"] = cib_autos_unl
+
+results["crosses_qe_galaxy"] = crosses_dict_qe_galaxy
+results["crosses_qe_galaxy_unlensed"] = crosses_dict_qe_galaxy_unlensed
+results["crosses_qe_galaxy_unlensed_cleaned"] = crosses_dict_qe_galaxy_unlensed_cleaned
+results["crosses_qe_cleaned_galaxy"] = crosses_dict_qe_cleaned_galaxy
+results["gal_crosses"] = gal_crosses
+results["gal_autos"] = gal_autos
+results["gal_crosses_unl"] = gal_crosses_unl
+results["gal_autos_unl"] = gal_autos_unl
 
 from delensalot.core.iterator import statics
 
@@ -330,5 +486,5 @@ crosses_born_gaussian = np.array([[hp.alm2cl(palm_copy(plm_in, lmax = lmax_qlm),
 
 results["auto_in_born_gaussian"] = auto_in_born_gaussian
 results["crosses_born_gaussian"] = crosses_born_gaussian
-
+version = out_version
 np.save(outputdir/f"results_{qe_key}_{version}_{studycase}_{imin}_{imax}", results)

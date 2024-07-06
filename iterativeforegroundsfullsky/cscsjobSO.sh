@@ -1,6 +1,6 @@
 #!/bin/sh -l
 #SBATCH --job-name=lenscarf
-#SBATCH --time=06:00:00
+#SBATCH --time=01:00:00
 #SBATCH --ntasks-per-node=2
 #SBATCH --cpus-per-task=12
 #SBATCH --constraint=gpu
@@ -17,21 +17,21 @@ export OMP_NUM_THREADS=12
 export OMP_PLACES=threads
 export OMP_PROC_BIND=false
 
-#srun python ./itfgs/params/S4n32.py -k ptt_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postborn" -v "" 
-#srun python ./itfgs/params/S4n32.py -k ptt_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postbornrand" -v "" 
-#srun python ./itfgs/params/S4n32.py -k ptt_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postborngauss" -v "" 
+#srun python ./itfgs/params/SOn32.py -k ptt -imin 0 -imax 63 -itmax 0 -tol 7 -case "" -v ""
+#srun python ./itfgs/params/SOn32.py -k ptt -imin 0 -imax 63 -itmax 0 -tol 7 -case "rand" -v ""
+#srun python ./itfgs/params/SOn32.py -k ptt -imin 0 -imax 63 -itmax 0 -tol 7 -case "gauss" -v ""
 
-srun python ./itfgs/params/S4n32.py -k p_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postborn" -v "" 
-srun python ./itfgs/params/S4n32.py -k p_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postbornrand" -v "" 
-srun python ./itfgs/params/S4n32.py -k p_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postborngauss" -v "" 
+#srun python ./itfgs/params/SOn32.py -k p -imin 0 -imax 63 -itmax 0 -tol 7 -case "postborn" -v ""
+#srun python ./itfgs/params/SOn32.py -k p -imin 0 -imax 63 -itmax 0 -tol 7 -case "postbornrand" -v ""
+#srun python ./itfgs/params/SOn32.py -k p -imin 0 -imax 63 -itmax 0 -tol 7 -case "postborngauss" -v ""
 
-srun python ./itfgs/params/S4n32.py -k ptt_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "" -v ""
-srun python ./itfgs/params/S4n32.py -k ptt_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "rand" -v ""
-srun python ./itfgs/params/S4n32.py -k ptt_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "gauss" -v ""
+#srun python ./itfgs/params/SOn32.py -k ptt_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postborn" -v ""
+#srun python ./itfgs/params/SOn32.py -k ptt_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postbornrand" -v ""
+#srun python ./itfgs/params/SOn32.py -k ptt_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postborngauss" -v ""
 
-srun python ./itfgs/params/S4n32.py -k p_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "" -v ""
-srun python ./itfgs/params/S4n32.py -k p_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "rand" -v ""
-srun python ./itfgs/params/S4n32.py -k p_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "gauss" -v ""
+#srun python ./itfgs/params/SOn32.py -k p_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postborn" -v ""
+#srun python ./itfgs/params/SOn32.py -k p_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postbornrand" -v ""
+srun python ./itfgs/params/SOn32.py -k p_bh_s -imin 0 -imax 63 -itmax 0 -tol 7 -case "postborngauss" -v ""
 
 #srun python ./itfgs/params/S4n32.py -k ptt -imin 0 -imax 63 -itmax 6 -tol 7 -case "" -v "empirical"
 #srun python ./itfgs/params/S4n32.py -k ptt -imin 0 -imax 63 -itmax 6 -tol 7 -case "rand" -v "empirical" 

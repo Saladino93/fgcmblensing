@@ -92,12 +92,12 @@ class SehgalSim(sims_postborn):
 
 include_fgs_power = False
 
-baseSehgal = opj(os.environ['SCRATCH'], 'SKYSIMS/GIULIOSIMS/')
-baseWebsky = opj(os.environ['SCRATCH'], 'SKYSIMS/WEBSKYSIMS/')
+baseSehgal = opj(os.environ['SCRATCH'], 'SKYSIMS/AGORASIMS/')
+#baseWebsky = opj(os.environ['SCRATCH'], 'SKYSIMS/WEBSKYSIMS/')
 #baseSehgal = opj(os.environ['SCRATCH'], 'SehgalSims')
 
-suffix = 'SOGiulio' # descriptor to distinguish this parfile from others...
-suffixWebsky = 'SOWebsky'
+suffix = 'S4AGORA' # descriptor to distinguish this parfile from others...
+suffixWebsky = 'S4Websky'
 
 casostd = ""
 casorand = "rand"
@@ -147,7 +147,7 @@ def get_info(caso: str) -> tuple:
         suffixLensing = suffix+'BornRand5120'
 
         SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'map0_kappa_ecp262_dmn2_lmax8000_first_randomized_alm.fits')
+        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'cmbkappa', 'agora_born_cmbkappa_highzadded_lowLcorrected_randomized_alm.fits')
 
     elif caso == casogauss:
         suffixCMB = suffix+'BornGauss5120'
@@ -155,7 +155,7 @@ def get_info(caso: str) -> tuple:
         suffixLensing = suffix+'BornGauss5120'
 
         SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'bornGaussian/born_kappa_gauss_alm_{idx}.fits')
+        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'gaussiancmbkappa', f'agora_born_cmbkappa_highzadded_lowLcorrected/agora_born_cmbkappa_highzadded_lowLcorrected_gauss_alm_{idx}.fits')
 
     elif caso == casostd:
         suffixCMB = suffix+'Born5120'
@@ -163,7 +163,7 @@ def get_info(caso: str) -> tuple:
         suffixLensing = suffix+'Born5120'
 
         SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'map0_kappa_ecp262_dmn2_lmax8000_first_alm.fits')
+        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'cmbkappa', 'agora_born_cmbkappa_highzadded_lowLcorrected.fits')
 
         names = ['']
         SimsShegalDict[0] = [lambda idx: opj(baseSehgal, nome) for nome in names]
@@ -280,7 +280,7 @@ def get_info(caso: str) -> tuple:
         suffixLensing = suffix+'PostBorn5120'
 
         SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'map0_kappa_ecp262_dmn2_lmax8000_alm.fits')
+        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'cmbkappa', 'agora_raytrace16384_cmbkappa_highzadded_lowLcorrected_alm.fits')
 
         names = ['']
         SimsShegalDict[0] = [lambda idx: opj(baseSehgal, nome) for nome in names]
@@ -292,7 +292,7 @@ def get_info(caso: str) -> tuple:
         suffixLensing = suffix+'PostBornRand5120'
 
         SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'map0_kappa_ecp262_dmn2_lmax8000_randomized_alm.fits')
+        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'cmbkappa', 'agora_raytrace16384_cmbkappa_highzadded_lowLcorrected_randomized_alm.fits')
 
         names = ['']
         SimsShegalDict[0] = [lambda idx: opj(baseSehgal, nome) for nome in names]
@@ -304,7 +304,7 @@ def get_info(caso: str) -> tuple:
         suffixLensing = suffix+'PostBornGauss5120'
 
         SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'postbornGaussian/postborn_kappa_gauss_alm_{idx}.fits')
+        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'gaussiancmbkappa', f'agora_raytrace16384_cmbkappa_highzadded_lowLcorrected/agora_raytrace16384_cmbkappa_highzadded_lowLcorrected_gauss_alm_{idx}.fits')
 
     elif caso == casowebskyborn:
 
@@ -382,23 +382,19 @@ def get_all(case: str):
     lib_dir_CMB = opj(os.environ['SCRATCH'], main_dir, suffixCMBPhas, 'cmbs') #this is where I store phas, if already computed
     TEMP =  opj(os.environ['SCRATCH'], main_dir, suffixLensing, 'lenscarfrecs')
 
+    #lib_dir_CMB = "/users/odarwish/scratch/oldn32/S4Giulio/cmbs"
+    #SIMDIR = "/users/odarwish/scratch/oldn32/S4GiulioBornGauss5120/cmbs"
     print("SIMDIR: ", SIMDIR)
     print("lib_dir_CMB: ", lib_dir_CMB)
     print("TEMP: ", TEMP)
 
     fgs = 0.
 
-    if "websky" in case:
-        print("Cosmology for", case)
-        cls_path = opj(os.environ['HOME'], 'fgcmblensing', 'input', 'websky')
-        cls_unl = utils.camb_clfile(opj(cls_path, 'lensedCMB_dmn1_lenspotentialCls_websky.dat'))
-        cls_len = utils.camb_clfile(opj(cls_path, 'lensedCMB_dmn1_lensedCls_websky.dat'))
-        cls_grad = camb_clfile_gradient(opj(cls_path, 'new_lensedCMB_dmn1_lensedgradCls_websky.dat'))
-    else:
-        cls_path = opj(os.environ['HOME'], 'fgcmblensing', 'input', 'giulio')
-        cls_unl = utils.camb_clfile(opj(cls_path, 'lensedCMB_dmn1_lenspotentialCls.dat'))
-        cls_len = utils.camb_clfile(opj(cls_path, 'lensedCMB_dmn1_lensedCls.dat'))
-        cls_grad = camb_clfile_gradient(opj(cls_path, 'lensedCMB_dmn1_lensedgradCls.dat'))
+    
+    cls_path = opj(os.environ['HOME'], 'n32clean', 'data')
+    cls_unl = utils.camb_clfile(opj(cls_path, 'lensedCMB_dmn1_lenspotentialCls.dat'))
+    cls_len = utils.camb_clfile(opj(cls_path, 'lensedCMB_dmn1_lensedCls.dat'))
+    cls_grad = camb_clfile_gradient(opj(cls_path, 'lensedCMB_dmn1_lensedgradCls.dat'))
 
 
 
@@ -410,11 +406,11 @@ def get_all(case: str):
     ll = np.arange(0, len(cls_len['tt']), 1)
     cls_foregrounds = 0.
 
-    lmax_ivf, mmax_ivf, beam, nlev_t, nlev_p = (3500, 3500, 1.4, 6., 6. * np.sqrt(2.))
+    lmax_ivf, mmax_ivf, beam, nlev_t, nlev_p = (4000, 4000, 1., 1., 1. * np.sqrt(2.))
 
     nlev_t_filter = nlev_t
 
-    lmin_tlm, lmin_elm, lmin_blm = (100, 100, 100) # The fiducial transfer functions are set to zero below these lmins
+    lmin_tlm, lmin_elm, lmin_blm = (10, 10, 10) # The fiducial transfer functions are set to zero below these lmins
     # for delensing useful to cut much more B. It can also help since the cg inversion does not have to reconstruct those.
 
     lmax_phi, mmax_phi = (5120, 5120)
@@ -584,18 +580,10 @@ def get_all(case: str):
             np.savetxt(opj(libdir_iterator, "R.txt"), R)
             # Isotropic Wiener-filter (here assuming for simplicity N0 ~ 1/R)
             WF = cpp * utils.cli(cpp + utils.cli(R))
-
-            if "empirical" in version:
-                #empirical WF
-                print("EMPIRICAL WF!!!", f"for case {case}")
-                WF_empirical = np.load("/users/odarwish/fgcmblensing/iterativeforegroundsfullsky/itfgs/params/WFdict.npy", allow_pickle = True).item()
-                WF = WF_empirical[case][0]
-
             plm0 = alm_copy(plm0,  None, lmax_qlm, mmax_qlm) # Just in case the QE and MAP mmax'es were not consistent
-
             almxfl(plm0, utils.cli(R), mmax_qlm, True) # Normalized QE
             np.save(path_plm0_QE_norm, plm0)
-            #np.savetxt(opj(libdir_iterator, "WF.txt"), WF)
+            np.savetxt(opj(libdir_iterator, "WF.txt"), WF)
             almxfl(plm0, WF, mmax_qlm, True)           # Wiener-filter QE
             almxfl(plm0, cpp > 0, mmax_qlm, True)
             np.save(path_plm0, plm0)

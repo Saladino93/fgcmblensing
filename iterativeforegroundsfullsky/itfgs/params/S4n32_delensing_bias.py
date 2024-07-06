@@ -96,8 +96,8 @@ baseSehgal = opj(os.environ['SCRATCH'], 'SKYSIMS/GIULIOSIMS/')
 baseWebsky = opj(os.environ['SCRATCH'], 'SKYSIMS/WEBSKYSIMS/')
 #baseSehgal = opj(os.environ['SCRATCH'], 'SehgalSims')
 
-suffix = 'SOGiulio' # descriptor to distinguish this parfile from others...
-suffixWebsky = 'SOWebsky'
+suffix = 'S4Giulio' # descriptor to distinguish this parfile from others...
+suffixWebsky = 'S4Websky'
 
 casostd = ""
 casorand = "rand"
@@ -108,8 +108,8 @@ casostdflip = "bornflipped"
 casorandlog = "randlog"
 casolog = "log"
 
-casopblog = "postlog"
-casopblogrand = "postlogrand"
+casopostlog = "postlog"
+casopostlogrand = "postlogrand"
 
 casorandlogdoubleskew = "randlogdoubleskew"
 casologdoubleskew = "logdoubleskew"
@@ -214,22 +214,31 @@ def get_info(caso: str) -> tuple:
 
         SimsShegalDict = {}
         SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'lognormalfirst/lognormal_factor_1_idx_0_alm.fits')
-        
-    elif caso == casopblog:
+    elif caso == casorandlog:
+        suffixCMB = suffix+'BornRandLog5120'
+        suffixCMBPhas = suffix
+        suffixLensing = suffix+'BornRandLog5120'
+
+        SimsShegalDict = {}
+        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'lognormalfirst/lognormal_factor_1_randomized_idx_0_alm.fits')
+
+
+    elif caso == casopostlog:
+
         suffixCMB = suffix+'PostBornLog5120'
         suffixCMBPhas = suffix
         suffixLensing = suffix+'PostBornLog5120'
 
         SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'lognormal/lognormal_factor_1_idx_0_alm.fits')
-                   
-    elif caso == casopblogrand:
-        suffixCMB = suffix+'PostBornRandLog5120'
+        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'lognormalpost/post_lognormal_alm_{0}.fits')
+
+    elif caso == casopostlogrand:
+        suffixCMB = suffix+'PostBornLogRand5120'
         suffixCMBPhas = suffix
-        suffixLensing = suffix+'PostBornRandLog5120'
+        suffixLensing = suffix+'PostBornLogRand5120'
 
         SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'lognormal/lognormal_factor_1_randomized_idx_0_alm.fits')
+        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'lognormalpost/post_lognormal_randomized_alm_{0}.fits')
 
     elif caso == casologdoubleskew:
         suffixCMB = suffix+'BornLogDoubleSkew5120'
@@ -360,7 +369,7 @@ def get_info(caso: str) -> tuple:
 
 
     else:
-        raise ValueError(f'{caso} not recognized')
+        raise ValueError('caso not recognized')
 
     
     return suffixCMB, suffixCMBPhas, suffixLensing, SimsShegalDict, extra_tlm
@@ -382,6 +391,8 @@ def get_all(case: str):
     lib_dir_CMB = opj(os.environ['SCRATCH'], main_dir, suffixCMBPhas, 'cmbs') #this is where I store phas, if already computed
     TEMP =  opj(os.environ['SCRATCH'], main_dir, suffixLensing, 'lenscarfrecs')
 
+    #lib_dir_CMB = "/users/odarwish/scratch/oldn32/S4Giulio/cmbs"
+    #SIMDIR = "/users/odarwish/scratch/oldn32/S4GiulioBornGauss5120/cmbs"
     print("SIMDIR: ", SIMDIR)
     print("lib_dir_CMB: ", lib_dir_CMB)
     print("TEMP: ", TEMP)
@@ -410,11 +421,11 @@ def get_all(case: str):
     ll = np.arange(0, len(cls_len['tt']), 1)
     cls_foregrounds = 0.
 
-    lmax_ivf, mmax_ivf, beam, nlev_t, nlev_p = (3500, 3500, 1.4, 6., 6. * np.sqrt(2.))
+    lmax_ivf, mmax_ivf, beam, nlev_t, nlev_p = (4000, 4000, 1., 1., 1. * np.sqrt(2.))
 
     nlev_t_filter = nlev_t
 
-    lmin_tlm, lmin_elm, lmin_blm = (100, 100, 100) # The fiducial transfer functions are set to zero below these lmins
+    lmin_tlm, lmin_elm, lmin_blm = (10, 10, 10) # The fiducial transfer functions are set to zero below these lmins
     # for delensing useful to cut much more B. It can also help since the cg inversion does not have to reconstruct those.
 
     lmax_phi, mmax_phi = (5120, 5120)
@@ -473,7 +484,7 @@ def get_all(case: str):
     #       actual data transfer function for the sim generation:
     transf_dat =  gauss_beam(beam / 180 / 60 * np.pi, lmax=4096) # (taking here full sims cmb's which are given to 4096)
 
-    fixed_index_cmb = None
+    fixed_index_cmb = 0
     print("Note, different cmb index!!", fixed_index_cmb)
     zero_noise = False
     fixed_noise_index = None #0 #this will allow to have always the same experimental noise realization
@@ -487,15 +498,11 @@ def get_all(case: str):
     sims      = simsit.cmb_maps_nlev_sehgal(sims_cmb_len = sims_cmb_len, cl_transf = transf_dat, 
                                     nlev_t = nlev_t, nlev_p = nlev_p, nside = nside, pix_lib_phas = pix_phas, zero_noise = zero_noise, fixed_noise_index = fixed_noise_index, fixed_index = fixed_index_cmb)
 
-    sims_second_leg      = simsit.cmb_maps_nlev_sehgal(sims_cmb_len = sims_cmb_len, cl_transf = transf_dat, 
-                                    nlev_t = nlev_t, nlev_p = nlev_p, nside = nside, pix_lib_phas = pix_phas, zero_noise = zero_noise, fixed_noise_index = 40, fixed_index = fixed_index_cmb)
-
     # Makes the simulation library consistent with the zbounds
     sims_MAP  = utils_sims.ztrunc_sims(sims, nside, [zbounds])
     # -------------------------
 
     ivfs   = filt_simple.library_fullsky_sepTP(opj(TEMP, 'ivfs'), sims, nside, transf_d, cls_len, ftl, fel, fbl, cache=True)
-    #ivfs_second_leg   = filt_simple.library_fullsky_sepTP(opj(TEMP, 'ivfs_second_leg'), sims_second_leg, nside, transf_d, cls_len, ftl, fel, fbl, cache=True)
     #library_jTP, lib_dir, sim_lib, cl_weights, soltn_lib=None, cache=True
 
     # ---- QE libraries from plancklens to calculate unnormalized QE (qlms) and their spectra (qcls)
@@ -508,7 +515,7 @@ def get_all(case: str):
     fal["bb"] = fbl
     resplib = qresp.resp_lib_simple(opj(TEMP, 'qlms_dd'), lmax_ivf, cls_weight = cls_grad, cls_cmb = cls_len, fal = fal, lmax_qlm = lmax_qlm)
     qlms_dd = qest.library_sepTP(opj(TEMP, 'qlms_dd'), ivfs, ivfs,   cls_len['te'], nside, lmax_qlm=lmax_qlm, resplib = resplib)
-    #qcls_dd = qecl.library(opj(TEMP, 'qcls_dd'), qlms_dd, qlms_dd, mc_sims_bias)
+    qcls_dd = qecl.library(opj(TEMP, 'qcls_dd'), qlms_dd, qlms_dd, mc_sims_bias)
     # -------------------------
     # This following block is only necessary if a full, Planck-like QE lensing power spectrum analysis is desired
     # This uses 'ds' and 'ss' QE's, crossing data with sims and sims with other sims.
@@ -558,13 +565,22 @@ def get_all(case: str):
 
         path_plm0 = opj(libdir_iterator, 'phi_plm_it000.npy')
         path_plm0_QE_norm = opj(libdir_iterator, 'normalized_phi_plm_it000.npy')
+        path_plm0_QE_norm_no_offset = opj(libdir_iterator, 'normalized_phi_plm_it000_no_offset.npy')
 
         path_slm0 = opj(libdir_iterator, 's_slm_it000.npy')
         path_slm0_QE_norm = opj(libdir_iterator, 'normalized_s_slm_it000.npy')
 
-        if not os.path.exists(path_plm0):
+        if True:
             # We now build the Wiener-filtered QE here since not done already
-            plm0  = qlms_dd.get_sim_qlm(k, int(simidx))  #Unormalized quadratic estimate:
+            offset = 10
+            print("Offset", offset)
+            plm0  = qlms_dd.get_sim_qlm(k, int(simidx)+offset)  #Unormalized quadratic estimate:
+
+            plm0_2  = qlms_dd.get_sim_qlm(k, int(simidx)+offset+1)
+
+            plm0_3 = qlms_dd.get_sim_qlm(k, int(simidx)+offset+2)
+
+            plm0_no_offset  = qlms_dd.get_sim_qlm(k, int(simidx))  #Unormalized quadratic estimate:
 
             if k == "p" or k == "p_bh_s":
                     cls_filter = {}
@@ -585,20 +601,30 @@ def get_all(case: str):
             # Isotropic Wiener-filter (here assuming for simplicity N0 ~ 1/R)
             WF = cpp * utils.cli(cpp + utils.cli(R))
 
-            if "empirical" in version:
-                #empirical WF
-                print("EMPIRICAL WF!!!", f"for case {case}")
-                WF_empirical = np.load("/users/odarwish/fgcmblensing/iterativeforegroundsfullsky/itfgs/params/WFdict.npy", allow_pickle = True).item()
-                WF = WF_empirical[case][0]
-
             plm0 = alm_copy(plm0,  None, lmax_qlm, mmax_qlm) # Just in case the QE and MAP mmax'es were not consistent
+            plm0_2 = alm_copy(plm0_2,  None, lmax_qlm, mmax_qlm) # Just in case the QE and MAP mmax'es were not consistent
+            plm0_3 = alm_copy(plm0_3,  None, lmax_qlm, mmax_qlm) # Just in case the QE and MAP mmax'es were not consistent
+            plm0_no_offset = alm_copy(plm0_no_offset,  None, lmax_qlm, mmax_qlm) # Just in case the QE and MAP mmax'es were not consistent
 
             almxfl(plm0, utils.cli(R), mmax_qlm, True) # Normalized QE
+            almxfl(plm0_no_offset, utils.cli(R), mmax_qlm, True) # Normalized QE
+            almxfl(plm0_2, utils.cli(R), mmax_qlm, True) # Normalized QE
+            almxfl(plm0_3, utils.cli(R), mmax_qlm, True) # Normalized QE
+
             np.save(path_plm0_QE_norm, plm0)
-            #np.savetxt(opj(libdir_iterator, "WF.txt"), WF)
+            np.save(path_plm0_QE_norm_no_offset, plm0_no_offset)
+
+            np.savetxt(opj(libdir_iterator, "WF.txt"), WF)
+
             almxfl(plm0, WF, mmax_qlm, True)           # Wiener-filter QE
             almxfl(plm0, cpp > 0, mmax_qlm, True)
             np.save(path_plm0, plm0)
+
+            almxfl(plm0_2, WF, mmax_qlm, True)           # Wiener-filter QE
+            almxfl(plm0_2, cpp > 0, mmax_qlm, True)
+
+            almxfl(plm0_3, WF, mmax_qlm, True)           # Wiener-filter QE
+            almxfl(plm0_3, cpp > 0, mmax_qlm, True)
 
         """if k == "ptt_bh_s":
             
@@ -844,7 +870,7 @@ def get_all(case: str):
         else:
             iterator = scarf_iterator.iterator_pertmf(libdir_iterator, 'p', (lmax_qlm, mmax_qlm), datmaps,
                     plm0, mf_resp, R_unl, cpp, cls_unl, filtr, k_geom, chain_descrs(lmax_unl, cg_tol), stepper
-                    ,mf0=mf0, wflm0 = wflm0)
+                    ,mf0=mf0, wflm0 = wflm0, plm0_2 = plm0_2, plm0_3 = plm0_3)
         return iterator
     
     return get_itlib, libdir_iterators, chain_descrs, lmax_unl, analysis_info, sims_cmb_len

@@ -80,15 +80,15 @@ class SehgalSim(sims_postborn):
     
     def get_sim_kappa(self, idx, verbose: bool = True):
         if verbose:
-            print('Getting special kappa!')
+            print('Getting FLIPPED special kappa!')
         nome = self.sims[self.kappakey](idx)
-        return hp.read_map(nome)
+        return -hp.read_map(nome)
     
     def get_sim_kappa_alm(self, idx, verbose: bool = True):
         if verbose:
-            print('Getting special kappa alm!')
+            print('Getting FLIPPED special kappa alm!')
         nome = self.sims[self.kappakey](idx)
-        return hp.read_alm(nome)
+        return -hp.read_alm(nome)
 
 include_fgs_power = False
 
@@ -96,8 +96,8 @@ baseSehgal = opj(os.environ['SCRATCH'], 'SKYSIMS/GIULIOSIMS/')
 baseWebsky = opj(os.environ['SCRATCH'], 'SKYSIMS/WEBSKYSIMS/')
 #baseSehgal = opj(os.environ['SCRATCH'], 'SehgalSims')
 
-suffix = 'SOGiulio' # descriptor to distinguish this parfile from others...
-suffixWebsky = 'SOWebsky'
+suffix = 'S4Giulio' # descriptor to distinguish this parfile from others...
+suffixWebsky = 'S4Websky'
 
 casostd = ""
 casorand = "rand"
@@ -108,8 +108,8 @@ casostdflip = "bornflipped"
 casorandlog = "randlog"
 casolog = "log"
 
-casopblog = "postlog"
-casopblogrand = "postlogrand"
+casopostlog = "postlog"
+casopostlogrand = "postlogrand"
 
 casorandlogdoubleskew = "randlogdoubleskew"
 casologdoubleskew = "logdoubleskew"
@@ -142,25 +142,25 @@ def get_info(caso: str) -> tuple:
 
     if caso == casorand:
 
-        suffixCMB = suffix+'BornRand5120'
+        suffixCMB = suffix+'FlippedBornRand5120'
         suffixCMBPhas = suffix
-        suffixLensing = suffix+'BornRand5120'
+        suffixLensing = suffix+'FlippedBornRand5120'
 
         SimsShegalDict = {}
         SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'map0_kappa_ecp262_dmn2_lmax8000_first_randomized_alm.fits')
 
     elif caso == casogauss:
-        suffixCMB = suffix+'BornGauss5120'
+        suffixCMB = suffix+'FlippedBornGauss5120'
         suffixCMBPhas = suffix
-        suffixLensing = suffix+'BornGauss5120'
+        suffixLensing = suffix+'FlippedBornGauss5120'
 
         SimsShegalDict = {}
         SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'bornGaussian/born_kappa_gauss_alm_{idx}.fits')
 
     elif caso == casostd:
-        suffixCMB = suffix+'Born5120'
+        suffixCMB = suffix+'FlippedBorn5120'
         suffixCMBPhas = suffix
-        suffixLensing = suffix+'Born5120'
+        suffixLensing = suffix+'FlippedBorn5120'
 
         SimsShegalDict = {}
         SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'map0_kappa_ecp262_dmn2_lmax8000_first_alm.fits')
@@ -170,27 +170,27 @@ def get_info(caso: str) -> tuple:
 
     elif caso == casorotgauss:
 
-        suffixCMB = suffix+'RotGauss5120'
+        suffixCMB = suffix+'FlippedRotGauss5120'
         suffixCMBPhas = suffix
-        suffixLensing = suffix+'RotGauss5120'
+        suffixLensing = suffix+'FlippedRotGauss5120'
 
         SimsShegalDict = {}
         SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'rotationGaussian/rotation_kappa_gauss_alm_{idx}.fits')
 
     elif caso == casorot:
 
-        suffixCMB = suffix+'Rot5120'
+        suffixCMB = suffix+'FlippedRot5120'
         suffixCMBPhas = suffix
-        suffixLensing = suffix+'Rot5120'
+        suffixLensing = suffix+'FlippedRot5120'
 
         SimsShegalDict = {}
         SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'map0_rotation_ecp262_dmn2_lmax8000_alm.fits')
 
     elif caso == casorotrand:
 
-        suffixCMB = suffix+'RotRand5120'
+        suffixCMB = suffix+'FlippedRotRand5120'
         suffixCMBPhas = suffix
-        suffixLensing = suffix+'RotRand5120'
+        suffixLensing = suffix+'FlippedRotRand5120'
 
         SimsShegalDict = {}
         SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'map0_rotation_ecp262_dmn2_lmax8000_randomized_alm.fits')
@@ -208,28 +208,37 @@ def get_info(caso: str) -> tuple:
         SimsShegalDict[0] = [lambda idx: opj(baseSehgal, nome) for nome in names]
 
     elif caso == casolog:
-        suffixCMB = suffix+'BornLog5120'
+        suffixCMB = suffix+'FlippedBornLog5120'
         suffixCMBPhas = suffix
-        suffixLensing = suffix+'BornLog5120'
+        suffixLensing = suffix+'FlippedBornLog5120'
 
         SimsShegalDict = {}
         SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'lognormalfirst/lognormal_factor_1_idx_0_alm.fits')
-        
-    elif caso == casopblog:
-        suffixCMB = suffix+'PostBornLog5120'
+    elif caso == casorandlog:
+        suffixCMB = suffix+'FlippedBornRandLog5120'
         suffixCMBPhas = suffix
-        suffixLensing = suffix+'PostBornLog5120'
+        suffixLensing = suffix+'FlippedBornRandLog5120'
 
         SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'lognormal/lognormal_factor_1_idx_0_alm.fits')
-                   
-    elif caso == casopblogrand:
-        suffixCMB = suffix+'PostBornRandLog5120'
+        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'lognormalfirst/lognormal_factor_1_randomized_idx_0_alm.fits')
+
+
+    elif caso == casopostlog:
+
+        suffixCMB = suffix+'FlippedPostBornLog5120'
         suffixCMBPhas = suffix
-        suffixLensing = suffix+'PostBornRandLog5120'
+        suffixLensing = suffix+'FlippedPostBornLog5120'
 
         SimsShegalDict = {}
-        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'lognormal/lognormal_factor_1_randomized_idx_0_alm.fits')
+        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'lognormalpost/post_lognormal_alm_{0}.fits')
+
+    elif caso == casopostlogrand:
+        suffixCMB = suffix+'FlippedPostBornLogRand5120'
+        suffixCMBPhas = suffix
+        suffixLensing = suffix+'FlippedPostBornLogRand5120'
+
+        SimsShegalDict = {}
+        SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'lognormalpost/post_lognormal_randomized_alm_{0}.fits')
 
     elif caso == casologdoubleskew:
         suffixCMB = suffix+'BornLogDoubleSkew5120'
@@ -275,9 +284,9 @@ def get_info(caso: str) -> tuple:
         
     elif caso == casopostborn:
         
-        suffixCMB = suffix+'PostBorn5120'
+        suffixCMB = suffix+'FlippedPostBorn5120'
         suffixCMBPhas = suffix
-        suffixLensing = suffix+'PostBorn5120'
+        suffixLensing = suffix+'FlippedPostBorn5120'
 
         SimsShegalDict = {}
         SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'map0_kappa_ecp262_dmn2_lmax8000_alm.fits')
@@ -287,9 +296,9 @@ def get_info(caso: str) -> tuple:
 
     elif caso == casopostbornrand:
         
-        suffixCMB = suffix+'PostBornRand5120'
+        suffixCMB = suffix+'FlippedPostBornRand5120'
         suffixCMBPhas = suffix
-        suffixLensing = suffix+'PostBornRand5120'
+        suffixLensing = suffix+'FlippedPostBornRand5120'
 
         SimsShegalDict = {}
         SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, 'map0_kappa_ecp262_dmn2_lmax8000_randomized_alm.fits')
@@ -299,9 +308,9 @@ def get_info(caso: str) -> tuple:
 
     elif caso == casopostborngauss:
         
-        suffixCMB = suffix+'PostBornGauss5120'
+        suffixCMB = suffix+'FlippedPostBornGauss5120'
         suffixCMBPhas = suffix
-        suffixLensing = suffix+'PostBornGauss5120'
+        suffixLensing = suffix+'FlippedPostBornGauss5120'
 
         SimsShegalDict = {}
         SimsShegalDict['kappa'] = lambda idx: opj(baseSehgal, f'postbornGaussian/postborn_kappa_gauss_alm_{idx}.fits')
@@ -360,7 +369,7 @@ def get_info(caso: str) -> tuple:
 
 
     else:
-        raise ValueError(f'{caso} not recognized')
+        raise ValueError('caso not recognized')
 
     
     return suffixCMB, suffixCMBPhas, suffixLensing, SimsShegalDict, extra_tlm
@@ -382,6 +391,8 @@ def get_all(case: str):
     lib_dir_CMB = opj(os.environ['SCRATCH'], main_dir, suffixCMBPhas, 'cmbs') #this is where I store phas, if already computed
     TEMP =  opj(os.environ['SCRATCH'], main_dir, suffixLensing, 'lenscarfrecs')
 
+    #lib_dir_CMB = "/users/odarwish/scratch/oldn32/S4Giulio/cmbs"
+    #SIMDIR = "/users/odarwish/scratch/oldn32/S4GiulioBornGauss5120/cmbs"
     print("SIMDIR: ", SIMDIR)
     print("lib_dir_CMB: ", lib_dir_CMB)
     print("TEMP: ", TEMP)
@@ -410,11 +421,11 @@ def get_all(case: str):
     ll = np.arange(0, len(cls_len['tt']), 1)
     cls_foregrounds = 0.
 
-    lmax_ivf, mmax_ivf, beam, nlev_t, nlev_p = (3500, 3500, 1.4, 6., 6. * np.sqrt(2.))
+    lmax_ivf, mmax_ivf, beam, nlev_t, nlev_p = (4000, 4000, 1., 1., 1. * np.sqrt(2.))
 
     nlev_t_filter = nlev_t
 
-    lmin_tlm, lmin_elm, lmin_blm = (100, 100, 100) # The fiducial transfer functions are set to zero below these lmins
+    lmin_tlm, lmin_elm, lmin_blm = (10, 10, 10) # The fiducial transfer functions are set to zero below these lmins
     # for delensing useful to cut much more B. It can also help since the cg inversion does not have to reconstruct those.
 
     lmax_phi, mmax_phi = (5120, 5120)
@@ -486,9 +497,6 @@ def get_all(case: str):
     sims_cmb_len = SehgalSim(sims = SimsShegalDict, lib_dir = SIMDIR, lmax_cmb = lmax_cmb, cls_unl = cls_unl, dlmax = dlmax, lmin_dlm = 2, lib_pha = libPHASCMB, extra_tlm = extra_tlm)
     sims      = simsit.cmb_maps_nlev_sehgal(sims_cmb_len = sims_cmb_len, cl_transf = transf_dat, 
                                     nlev_t = nlev_t, nlev_p = nlev_p, nside = nside, pix_lib_phas = pix_phas, zero_noise = zero_noise, fixed_noise_index = fixed_noise_index, fixed_index = fixed_index_cmb)
-
-    sims_second_leg      = simsit.cmb_maps_nlev_sehgal(sims_cmb_len = sims_cmb_len, cl_transf = transf_dat, 
-                                    nlev_t = nlev_t, nlev_p = nlev_p, nside = nside, pix_lib_phas = pix_phas, zero_noise = zero_noise, fixed_noise_index = 40, fixed_index = fixed_index_cmb)
 
     # Makes the simulation library consistent with the zbounds
     sims_MAP  = utils_sims.ztrunc_sims(sims, nside, [zbounds])
@@ -584,18 +592,10 @@ def get_all(case: str):
             np.savetxt(opj(libdir_iterator, "R.txt"), R)
             # Isotropic Wiener-filter (here assuming for simplicity N0 ~ 1/R)
             WF = cpp * utils.cli(cpp + utils.cli(R))
-
-            if "empirical" in version:
-                #empirical WF
-                print("EMPIRICAL WF!!!", f"for case {case}")
-                WF_empirical = np.load("/users/odarwish/fgcmblensing/iterativeforegroundsfullsky/itfgs/params/WFdict.npy", allow_pickle = True).item()
-                WF = WF_empirical[case][0]
-
             plm0 = alm_copy(plm0,  None, lmax_qlm, mmax_qlm) # Just in case the QE and MAP mmax'es were not consistent
-
             almxfl(plm0, utils.cli(R), mmax_qlm, True) # Normalized QE
             np.save(path_plm0_QE_norm, plm0)
-            #np.savetxt(opj(libdir_iterator, "WF.txt"), WF)
+            np.savetxt(opj(libdir_iterator, "WF.txt"), WF)
             almxfl(plm0, WF, mmax_qlm, True)           # Wiener-filter QE
             almxfl(plm0, cpp > 0, mmax_qlm, True)
             np.save(path_plm0, plm0)
